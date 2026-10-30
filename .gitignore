@@ -1,0 +1,21 @@
+# Xcode and Swift build products
+.build*/
+DerivedData/
+build/
+
+# Per-user Xcode state
+*.xcuserstate
+xcuserdata/
+
+# macOS metadata
+.DS_Store
+
+# Local signing and environment files
+.env
+.env.*
+!.env.example
+
+# Archives and exports
+*.xcarchive
+*.ipa
+*.dSYM/

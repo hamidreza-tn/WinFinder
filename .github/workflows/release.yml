@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Build and publish a GitHub Release
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Validate configuration
+        run: make validate
+
+      - name: Run unit tests
+        run: make test-logic
+
+      - name: Build Release app
+        run: make build CONFIGURATION=Release
+
+      - name: Zip app bundle
+        run: |
+          /usr/bin/ditto -c -k --keepParent \
+            .build/Build/Products/Release/WinFinder.app \
+            "WinFinder-${GITHUB_REF_NAME}.zip"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "WinFinder-${GITHUB_REF_NAME}.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "WinFinder $GITHUB_REF_NAME" \
+            --generate-notes

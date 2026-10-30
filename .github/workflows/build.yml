@@ -1,0 +1,51 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Validate, test, and build (macOS 26 / Xcode 26)
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Validate configuration
+        run: make validate
+
+      - name: Run unit tests
+        run: make test-logic
+
+      - name: Build (Debug)
+        run: make build
+
+      - name: Build Release app
+        run: make build CONFIGURATION=Release
+
+      - name: Zip app bundle
+        run: |
+          cd .build/Build/Products/Release
+          /usr/bin/ditto -c -k --keepParent WinFinder.app WinFinder.zip
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinFinder-macOS
+          path: .build/Build/Products/Release/WinFinder.zip
+          if-no-files-found: error
