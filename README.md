@@ -87,12 +87,17 @@ are active.
   the cut state is invalidated automatically if anything else is copied
 - 🧭 **Full navigation set** — parent folder, open, back and forward
 - 🗑️ **Delete & Shift+Delete** — to Trash or permanently
+- ⌨️ **Windows Ctrl layer** — Ctrl+C/X/V/Z/S/P/A/F/N/W/T/O, Ctrl+L (Go to
+  Folder), Ctrl+Shift+N (new folder)
 - ⏻ **Launch at login** — registered via `SMAppService`, with an honest toggle
   that reflects the real service state
 - 🌐 **6 interface languages** — English, Español, Français, 简体中文, हिन्दी,
   فارسی (with full RTL layout for Persian)
-- 🚦 **Menu bar control** — live status icon, one-click pause/resume, Settings,
-  Quit
+- 🚦 **Menu bar control** — status icon, one-click pause/resume (or pause for
+  an hour), a live list of active shortcuts, Settings, About, Quit
+- 🗂️ **Tabbed Settings** — Shortcuts / System / Status tabs with a live
+  cheat-sheet, diagnostics with a copyable report, settings export & import,
+  and a reset-to-defaults control
 - 🧪 **Tested** — the shortcut resolver and cut state have real unit tests,
   and configuration contracts are validated on every build
 - 🔋 **Battery friendly** — no polling loops, no heartbeat timers; the event

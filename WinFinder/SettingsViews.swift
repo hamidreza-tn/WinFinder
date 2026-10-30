@@ -1,5 +1,29 @@
 import SwiftUI
 import ServiceManagement
+import UniformTypeIdentifiers
+
+// MARK: - ثابت‌های طراحی
+/// Single source for spacing and corner radii so the UI stays consistent.
+private enum Design {
+    static let cornerRadius: CGFloat = 10
+    static let cardPadding: CGFloat = 12
+    static let groupSpacing: CGFloat = 16
+    static let rowSpacing: CGFloat = 10
+}
+
+/// Brand accent (from the AccentColor asset) used by switches, buttons, and
+/// the header mark.
+private enum Brand {
+    static let accent = Color("AccentColor")
+
+    static var headerGradient: LinearGradient {
+        LinearGradient(
+            colors: [accent.opacity(0.85), accent],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
 
 // MARK: - Lightweight localization system (English, Persian, Spanish, French,
 // Simplified Chinese, Hindi). English is the primary language; every missing
@@ -29,10 +53,6 @@ enum L10n {
             "header.active": "Active",
             "header.connecting": "Connecting",
             "header.paused": "Paused",
-            "menu.status.running": "WinFinder Pro: Active",
-            "menu.status.paused": "WinFinder Pro: Paused",
-            "menu.status.error": "WinFinder Pro: Connection error",
-            "menu.status.needsAccess": "WinFinder Pro: Needs access",
             "menu.shortcutsEnabled": "Shortcuts enabled",
             "menu.settings": "Settings…",
             "menu.quit": "Quit WinFinder",
@@ -83,6 +103,17 @@ enum L10n {
             "diag.macversion": "macOS version",
             "diag.appversion": "App version",
             "diag.copyreport": "Copy diagnostics report",
+            "perm.title": "Permissions",
+            "tab.shortcuts": "Shortcuts",
+            "tab.status": "Status",
+            "guide.empty": "All shortcuts are currently off. Turn on the ones you want above.",
+            "about.title": "About WinFinder Pro",
+            "about.license": "Released under the MIT License.",
+            "about.github": "View on GitHub",
+            "menu.pauseForHour": "Pause for 1 hour",
+            "settings.export": "Export settings",
+            "settings.import": "Import settings",
+            "settings.importFailed": "Could not import the settings file.",
             "diag.copied": "Copied!",
             "reset.button": "Reset all shortcuts",
             "reset.confirm": "All shortcut toggles will return to their defaults. Launch-at-login and the language stay unchanged.",
@@ -115,10 +146,6 @@ enum L10n {
             "header.active": "Activo",
             "header.connecting": "Conectando",
             "header.paused": "En pausa",
-            "menu.status.running": "WinFinder Pro: activo",
-            "menu.status.paused": "WinFinder Pro: en pausa",
-            "menu.status.error": "WinFinder Pro: error de conexión",
-            "menu.status.needsAccess": "WinFinder Pro: requiere acceso",
             "menu.shortcutsEnabled": "Atajos activados",
             "menu.settings": "Ajustes…",
             "menu.quit": "Salir de WinFinder",
@@ -169,6 +196,17 @@ enum L10n {
             "diag.macversion": "Versión de macOS",
             "diag.appversion": "Versión de la app",
             "diag.copyreport": "Copiar informe de diagnóstico",
+            "perm.title": "Permisos",
+            "tab.shortcuts": "Atajos",
+            "tab.status": "Estado",
+            "guide.empty": "Todos los atajos están desactivados. Activa arriba los que quieras.",
+            "about.title": "Acerca de WinFinder Pro",
+            "about.license": "Publicado bajo la Licencia MIT.",
+            "about.github": "Ver en GitHub",
+            "menu.pauseForHour": "Pausar durante 1 hora",
+            "settings.export": "Exportar ajustes",
+            "settings.import": "Importar ajustes",
+            "settings.importFailed": "No se pudo importar el archivo de ajustes.",
             "diag.copied": "¡Copiado!",
             "reset.button": "Restablecer todos los atajos",
             "reset.confirm": "Todos los atajos volverán a sus valores predeterminados. El inicio de sesión y el idioma no cambian.",
@@ -201,10 +239,6 @@ enum L10n {
             "header.active": "Actif",
             "header.connecting": "Connexion",
             "header.paused": "En pause",
-            "menu.status.running": "WinFinder Pro : actif",
-            "menu.status.paused": "WinFinder Pro : en pause",
-            "menu.status.error": "WinFinder Pro : erreur de connexion",
-            "menu.status.needsAccess": "WinFinder Pro : accès requis",
             "menu.shortcutsEnabled": "Raccourcis activés",
             "menu.settings": "Réglages…",
             "menu.quit": "Quitter WinFinder",
@@ -255,6 +289,17 @@ enum L10n {
             "diag.macversion": "Version de macOS",
             "diag.appversion": "Version de l'app",
             "diag.copyreport": "Copier le rapport de diagnostic",
+            "perm.title": "Autorisations",
+            "tab.shortcuts": "Raccourcis",
+            "tab.status": "État",
+            "guide.empty": "Tous les raccourcis sont désactivés. Activez ci-dessus ceux que vous voulez.",
+            "about.title": "À propos de WinFinder Pro",
+            "about.license": "Publié sous licence MIT.",
+            "about.github": "Voir sur GitHub",
+            "menu.pauseForHour": "Mettre en pause pendant 1 heure",
+            "settings.export": "Exporter les réglages",
+            "settings.import": "Importer les réglages",
+            "settings.importFailed": "Impossible d'importer le fichier de réglages.",
             "diag.copied": "Copié !",
             "reset.button": "Réinitialiser tous les raccourcis",
             "reset.confirm": "Tous les raccourcis reviendront à leurs valeurs par défaut. L'ouverture de session et la langue restent inchangées.",
@@ -287,10 +332,6 @@ enum L10n {
             "header.active": "运行中",
             "header.connecting": "连接中",
             "header.paused": "已暂停",
-            "menu.status.running": "WinFinder Pro：运行中",
-            "menu.status.paused": "WinFinder Pro：已暂停",
-            "menu.status.error": "WinFinder Pro：连接错误",
-            "menu.status.needsAccess": "WinFinder Pro：需要访问权限",
             "menu.shortcutsEnabled": "启用快捷键",
             "menu.settings": "设置…",
             "menu.quit": "退出 WinFinder",
@@ -341,6 +382,17 @@ enum L10n {
             "diag.macversion": "macOS 版本",
             "diag.appversion": "应用版本",
             "diag.copyreport": "复制诊断报告",
+            "perm.title": "权限",
+            "tab.shortcuts": "快捷键",
+            "tab.status": "状态",
+            "guide.empty": "所有快捷键当前已关闭。请在上方开启需要的快捷键。",
+            "about.title": "关于 WinFinder Pro",
+            "about.license": "基于 MIT 许可证发布。",
+            "about.github": "在 GitHub 上查看",
+            "menu.pauseForHour": "暂停 1 小时",
+            "settings.export": "导出设置",
+            "settings.import": "导入设置",
+            "settings.importFailed": "无法导入设置文件。",
             "diag.copied": "已复制！",
             "reset.button": "重置所有快捷键",
             "reset.confirm": "所有快捷键开关将恢复默认。登录启动和语言保持不变。",
@@ -373,10 +425,6 @@ enum L10n {
             "header.active": "सक्रिय",
             "header.connecting": "कनेक्ट हो रहा है",
             "header.paused": "रुका हुआ",
-            "menu.status.running": "WinFinder Pro: सक्रिय",
-            "menu.status.paused": "WinFinder Pro: रुका हुआ",
-            "menu.status.error": "WinFinder Pro: कनेक्शन त्रुटि",
-            "menu.status.needsAccess": "WinFinder Pro: पहुँच आवश्यक",
             "menu.shortcutsEnabled": "शॉर्टकट सक्रिय",
             "menu.settings": "सेटिंग्स…",
             "menu.quit": "WinFinder बंद करें",
@@ -427,6 +475,17 @@ enum L10n {
             "diag.macversion": "macOS संस्करण",
             "diag.appversion": "ऐप संस्करण",
             "diag.copyreport": "निदान रिपोर्ट कॉपी करें",
+            "perm.title": "अनुमतियाँ",
+            "tab.shortcuts": "शॉर्टकट",
+            "tab.status": "स्थिति",
+            "guide.empty": "सभी शॉर्टकट अभी बंद हैं। ऊपर से जो चाहें चालू करें।",
+            "about.title": "WinFinder Pro के बारे में",
+            "about.license": "MIT लाइसेंस के अंतर्गत जारी।",
+            "about.github": "GitHub पर देखें",
+            "menu.pauseForHour": "1 घंटे के लिए रोकें",
+            "settings.export": "सेटिंग्स निर्यात करें",
+            "settings.import": "सेटिंग्स आयात करें",
+            "settings.importFailed": "सेटिंग्स फ़ाइल आयात नहीं हो सकी।",
             "diag.copied": "कॉपी हो गया!",
             "reset.button": "सभी शॉर्टकट रीसेट करें",
             "reset.confirm": "सभी शॉर्टकट टॉगल डिफ़ॉल्ट पर लौट आएँगे। लॉगिन पर शुरुआत और भाषा अपरिवर्तित रहेंगे।",
@@ -459,10 +518,6 @@ enum L10n {
             "header.active": "فعال",
             "header.connecting": "در حال اتصال",
             "header.paused": "متوقف",
-            "menu.status.running": "WinFinder Pro: فعال",
-            "menu.status.paused": "WinFinder Pro: متوقف",
-            "menu.status.error": "WinFinder Pro: خطا در اتصال",
-            "menu.status.needsAccess": "WinFinder Pro: نیازمند دسترسی",
             "menu.shortcutsEnabled": "میانبرها فعال باشند",
             "menu.settings": "تنظیمات برنامه...",
             "menu.quit": "خروج کامل از برنامه",
@@ -513,6 +568,17 @@ enum L10n {
             "diag.macversion": "نسخه macOS",
             "diag.appversion": "نسخه برنامه",
             "diag.copyreport": "کپی گزارش عیب‌یابی",
+            "perm.title": "دسترسی‌ها",
+            "tab.shortcuts": "میانبرها",
+            "tab.status": "وضعیت",
+            "guide.empty": "همه میانبرها خاموش‌اند؛ میانبرهای موردنظر را از بالای همین بخش فعال کنید.",
+            "about.title": "درباره WinFinder Pro",
+            "about.license": "تحت لایسنس MIT منتشر شده است.",
+            "about.github": "مشاهده در گیت‌هاب",
+            "menu.pauseForHour": "توقف برای یک ساعت",
+            "settings.export": "برون‌بری تنظیمات",
+            "settings.import": "درون‌بری تنظیمات",
+            "settings.importFailed": "فایل تنظیمات درون‌ریزی نشد.",
             "diag.copied": "کپی شد!",
             "reset.button": "بازنشانی همه میانبرها",
             "reset.confirm": "همه کلیدهای میانبر به حالت پیش‌فرض برمی‌گردند. اجرای هنگام لاگین و زبان بدون تغییر می‌مانند.",
@@ -562,6 +628,87 @@ enum SystemSettingsOpener {
     }
 }
 
+// MARK: - ابزارهای مشترک نمایش
+/// The "2.4 (6)" style version string shown in Settings, Diagnostics, and About.
+func appVersionText() -> String {
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+    return "\(version) (\(build))"
+}
+
+/// The currently enabled shortcuts as (keycap, description) rows. Shared by
+/// the Settings cheat-sheet and the compact menu-bar list.
+func activeShortcutRows(language: String) -> [(keys: String, description: String)] {
+    let defaults = UserDefaults.standard
+    let enterToOpen = defaults.bool(forKey: "enterToOpen")
+    let deleteToTrash = defaults.bool(forKey: "deleteToTrash")
+    let shiftDeletePermanent = defaults.bool(forKey: "shiftDeletePermanent")
+    let cmdRRename = defaults.bool(forKey: "cmdRRename")
+    let cutAndPaste = defaults.bool(forKey: "cutAndPaste")
+    let altEnterProperties = defaults.bool(forKey: "altEnterProperties")
+    let altNavFolders = defaults.bool(forKey: "altNavFolders")
+    let f5Refresh = defaults.bool(forKey: "f5Refresh")
+    let backspaceUpFolder = defaults.bool(forKey: "backspaceUpFolder")
+    let ctrlShortcuts = defaults.bool(forKey: "ctrlShortcuts")
+
+    var rows: [(String, String)] = []
+    if enterToOpen {
+        rows.append(("Enter", L10n.tr(language, "cs.open")))
+    }
+    if backspaceUpFolder {
+        rows.append(("Delete", L10n.tr(language, "cs.parentFolder")))
+    } else if deleteToTrash {
+        rows.append(("Delete", L10n.tr(language, "cs.trash")))
+    }
+    if shiftDeletePermanent {
+        rows.append(("Shift + Delete", L10n.tr(language, "cs.permanentDelete")))
+    }
+    if cmdRRename {
+        rows.append(("Cmd + R  /  F2", L10n.tr(language, "cs.rename")))
+    }
+    if cutAndPaste {
+        rows.append(("Cmd + X  /  Cmd + V", L10n.tr(language, "cs.cutPaste")))
+    }
+    if altEnterProperties {
+        rows.append(("Alt + Enter", L10n.tr(language, "cs.properties")))
+    }
+    if altNavFolders {
+        rows.append(("Alt + ↑  /  Alt + ↓", L10n.tr(language, "cs.navUpDown")))
+        rows.append(("Alt + ←  /  Alt + →", L10n.tr(language, "cs.navBackForward")))
+    }
+    if f5Refresh {
+        rows.append(("F5", L10n.tr(language, "cs.refresh")))
+    }
+    if ctrlShortcuts {
+        rows.append(("Ctrl + C / X / V / Z / S / P / A / F / N / W / T / O", L10n.tr(language, "cs.ctrlLayer")))
+        rows.append(("Ctrl + L", L10n.tr(language, "cs.ctrlGoto")))
+        rows.append(("Ctrl + Shift + N", L10n.tr(language, "cs.ctrlNewFolder")))
+    }
+    return rows
+}
+
+/// Card look for settings groups: rounded panel, hairline border, group label
+/// as a section heading instead of the stock inset GroupBox chrome.
+struct CardGroupBoxStyle: GroupBoxStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: Design.rowSpacing) {
+            configuration.label
+                .font(.subheadline.weight(.semibold))
+            configuration.content
+        }
+        .padding(Design.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Design.cornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.cornerRadius, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+    }
+}
+
 extension AppDelegate.AppIssue {
     func displayText(_ language: String) -> String {
         switch self {
@@ -592,27 +739,50 @@ struct MainSettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = true
     @State private var didCopyReport = false
     @State private var showResetConfirmation = false
+    @State private var isApplyingLoginChange = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
             issuesBanner
-            ScrollView {
-                VStack(spacing: 16) {
-                    fileManagementGroup
-                    navigationGroup
-                    systemGroup
-                    permissionsGroup
-                    diagnosticsGroup
-                    shortcutGuideGroup
+            TabView {
+                ScrollView {
+                    VStack(spacing: Design.groupSpacing) {
+                        shortcutGuideGroup
+                        fileManagementGroup
+                        navigationGroup
+                    }
+                    .padding()
                 }
-                .padding()
+                .tabItem {
+                    Label(L10n.tr(appLanguage, "tab.shortcuts"), systemImage: "keyboard")
+                }
+                ScrollView {
+                    VStack(spacing: Design.groupSpacing) {
+                        systemGroup
+                    }
+                    .padding()
+                }
+                .tabItem {
+                    Label(L10n.tr(appLanguage, "group.system"), systemImage: "gearshape")
+                }
+                ScrollView {
+                    VStack(spacing: Design.groupSpacing) {
+                        permissionsGroup
+                        diagnosticsGroup
+                    }
+                    .padding()
+                }
+                .tabItem {
+                    Label(L10n.tr(appLanguage, "tab.status"), systemImage: "waveform.path.ecg")
+                }
             }
             Divider()
             footer
         }
-        .frame(width: 490, height: 640)
+        .frame(minWidth: 470, idealWidth: 490, maxWidth: 560,
+               minHeight: 540, idealHeight: 620, maxHeight: 780)
         .navigationTitle(L10n.tr(appLanguage, "window.title"))
         .environment(\.layoutDirection, appLanguage == "fa" ? .rightToLeft : .leftToRight)
         .confirmationDialog(
@@ -647,8 +817,14 @@ struct MainSettingsView: View {
     private var header: some View {
         HStack {
             Image(systemName: "keyboard.fill")
-                .font(.system(size: 32))
-                .foregroundColor(.blue)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(Brand.headerGradient)
+                )
+                .shadow(color: Brand.accent.opacity(0.35), radius: 4, y: 2)
             VStack(alignment: .leading, spacing: 2) {
                 Text("WinFinder Pro")
                     .font(.title2)
@@ -656,7 +832,7 @@ struct MainSettingsView: View {
                 Text(L10n.tr(appLanguage, "header.subtitle"))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("\(L10n.tr(appLanguage, "header.version")) \(versionText)")
+                Text("\(L10n.tr(appLanguage, "header.version")) \(appVersionText())")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -664,13 +840,9 @@ struct MainSettingsView: View {
             statusBadge
         }
         .padding()
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-
-    private var versionText: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-        return "\(version) (\(build))"
+        .background(Color(nsColor: .windowBackgroundColor))
+        .animation(.easeInOut(duration: 0.2), value: appDelegate.eventTapState)
+        .animation(.easeInOut(duration: 0.2), value: appDelegate.isPaused)
     }
 
     @ViewBuilder
@@ -679,37 +851,28 @@ struct MainSettingsView: View {
             let state = appDelegate.eventTapState
             HStack(spacing: 6) {
                 Circle()
-                    .fill(statusColor(state))
+                    .fill(AppStatusPresentation.color(isPaused: appDelegate.isPaused, state: state))
                     .frame(width: 10, height: 10)
-                Text(statusLabel(state))
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(statusColor(state))
+                Text(AppStatusPresentation.label(
+                    isPaused: appDelegate.isPaused,
+                    state: state,
+                    language: appLanguage
+                ))
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(AppStatusPresentation.color(isPaused: appDelegate.isPaused, state: state))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(statusColor(state).opacity(0.12))
+            .background(AppStatusPresentation.color(isPaused: appDelegate.isPaused, state: state).opacity(0.12))
             .cornerRadius(12)
         } else {
             Button(L10n.tr(appLanguage, "header.enableAccess")) {
                 appDelegate.requestAccessManually()
             }
             .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .tint(Color(nsColor: .systemOrange))
         }
-    }
-
-    private func statusLabel(_ state: AppDelegate.EventTapState) -> String {
-        if appDelegate.isPaused { return L10n.tr(appLanguage, "header.paused") }
-        if state == .running { return L10n.tr(appLanguage, "header.active") }
-        return L10n.tr(appLanguage, "header.connecting")
-    }
-
-    private func statusColor(_ state: AppDelegate.EventTapState) -> Color {
-        if appDelegate.isPaused { return .gray }
-        if state == .running { return .green }
-        if state == .failed || state == .retrying { return .red }
-        return .orange
     }
 
     // MARK: بنر خطاها
@@ -718,10 +881,10 @@ struct MainSettingsView: View {
     private var issuesBanner: some View {
         if !appDelegate.activeIssues.isEmpty {
             VStack(spacing: 6) {
-                ForEach(Array(appDelegate.activeIssues.enumerated()), id: \.offset) { _, issue in
+                ForEach(appDelegate.activeIssues, id: \.self) { issue in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
+                            .foregroundColor(Color(nsColor: .systemOrange))
                         VStack(alignment: .leading, spacing: 4) {
                             Text(issue.displayText(appLanguage))
                                 .font(.caption)
@@ -740,7 +903,9 @@ struct MainSettingsView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 6)
-            .background(Color.orange.opacity(0.08))
+            .background(Color(nsColor: .systemOrange).opacity(0.08))
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .animation(.easeOut(duration: 0.2), value: appDelegate.activeIssues)
         }
     }
 
@@ -748,7 +913,7 @@ struct MainSettingsView: View {
 
     private var fileManagementGroup: some View {
         GroupBox(label: Label(L10n.tr(appLanguage, "group.files"), systemImage: "doc.on.doc")) {
-            VStack(spacing: 10) {
+            VStack(spacing: Design.rowSpacing) {
                 ToggleRowItem(
                     title: L10n.tr(appLanguage, "enter.title"),
                     subtitle: L10n.tr(appLanguage, "enter.subtitle"),
@@ -761,6 +926,7 @@ struct MainSettingsView: View {
                     isOn: $deleteToTrash
                 )
                 .disabled(backspaceUpFolder)
+                .animation(.easeInOut(duration: 0.2), value: backspaceUpFolder)
                 Divider()
                 ToggleRowItem(
                     title: L10n.tr(appLanguage, "shiftDelete.title"),
@@ -774,8 +940,8 @@ struct MainSettingsView: View {
                     isOn: $cmdRRename
                 )
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     /// The trash toggle is overridden by the Delete-to-parent-folder shortcut;
@@ -789,7 +955,7 @@ struct MainSettingsView: View {
 
     private var navigationGroup: some View {
         GroupBox(label: Label(L10n.tr(appLanguage, "group.nav"), systemImage: "arrow.triangle.swap")) {
-            VStack(spacing: 10) {
+            VStack(spacing: Design.rowSpacing) {
                 ToggleRowItem(
                     title: L10n.tr(appLanguage, "cut.title"),
                     subtitle: L10n.tr(appLanguage, "cut.subtitle"),
@@ -826,27 +992,28 @@ struct MainSettingsView: View {
                     isOn: $ctrlShortcuts
                 )
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private var systemGroup: some View {
-        GroupBox(label: Label(L10n.tr(appLanguage, "group.system"), systemImage: "power")) {
-            VStack(spacing: 10) {
+        GroupBox(label: Label(L10n.tr(appLanguage, "group.system"), systemImage: "gearshape")) {
+            VStack(spacing: Design.rowSpacing) {
                 ToggleRowItem(
                     title: L10n.tr(appLanguage, "login.title"),
                     subtitle: L10n.tr(appLanguage, "login.subtitle"),
                     isOn: Binding(
                         get: { launchAtLogin },
                         set: { newValue in
-                            updateLaunchAtLogin(enabled: newValue)
+                            applyLaunchAtLogin(newValue)
                         }
                     )
                 )
+                .disabled(isApplyingLoginChange)
                 if !appDelegate.isRunningFromPreferredLocation {
                     Label(L10n.tr(appLanguage, "login.notApplications"), systemImage: "exclamationmark.triangle")
                         .font(.caption)
-                        .foregroundColor(.orange)
+                        .foregroundColor(Color(nsColor: .systemOrange))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Divider()
@@ -865,30 +1032,51 @@ struct MainSettingsView: View {
                     .accessibilityLabel(L10n.tr(appLanguage, "language.title"))
                 }
                 Divider()
+                HStack(spacing: 10) {
+                    Button(L10n.tr(appLanguage, "settings.export")) {
+                        exportSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Button(L10n.tr(appLanguage, "settings.import")) {
+                        importSettings()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                Divider()
                 Button(L10n.tr(appLanguage, "reset.button"), role: .destructive) {
                     showResetConfirmation = true
                 }
                 .frame(maxWidth: .infinity)
+                .help(L10n.tr(appLanguage, "reset.confirm"))
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private var permissionsGroup: some View {
-        GroupBox(label: Label(L10n.tr(appLanguage, "perm.hint"), systemImage: "lock.shield")) {
-            HStack {
-                Button(L10n.tr(appLanguage, "perm.openAccessibility")) {
-                    SystemSettingsOpener.openAccessibility()
+        GroupBox(label: Label(L10n.tr(appLanguage, "perm.title"), systemImage: "lock.shield")) {
+            VStack(spacing: Design.rowSpacing) {
+                HStack {
+                    Button(L10n.tr(appLanguage, "perm.openAccessibility")) {
+                        SystemSettingsOpener.openAccessibility()
+                    }
+                    .buttonStyle(.bordered)
+                    .help(L10n.tr(appLanguage, "perm.openAccessibility"))
+                    Spacer()
+                    Button(L10n.tr(appLanguage, "perm.openAutomation")) {
+                        SystemSettingsOpener.openAutomation()
+                    }
+                    .buttonStyle(.bordered)
+                    .help(L10n.tr(appLanguage, "perm.openAutomation"))
                 }
-                .buttonStyle(.bordered)
-                Spacer()
-                Button(L10n.tr(appLanguage, "perm.openAutomation")) {
-                    SystemSettingsOpener.openAutomation()
-                }
-                .buttonStyle(.bordered)
+                Text(L10n.tr(appLanguage, "perm.hint"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     // MARK: عیب‌یابی
@@ -923,7 +1111,7 @@ struct MainSettingsView: View {
                 )
                 diagnosticRow(
                     L10n.tr(appLanguage, "diag.appversion"),
-                    value: versionText,
+                    value: appVersionText(),
                     ok: true,
                     neutral: true
                 )
@@ -940,8 +1128,8 @@ struct MainSettingsView: View {
                     .disabled(didCopyReport)
                 }
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private var eventTapStateText: String {
@@ -957,14 +1145,19 @@ struct MainSettingsView: View {
     }
 
     private func diagnosticRow(_ title: String, value: String, ok: Bool, neutral: Bool = false) -> some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(title)
                 .font(.caption)
             Spacer()
+            if !neutral {
+                Circle()
+                    .fill(ok ? Color(nsColor: .systemGreen) : Color(nsColor: .systemOrange))
+                    .frame(width: 7, height: 7)
+            }
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(neutral ? .primary : (ok ? .green : .orange))
+                .foregroundColor(neutral ? .primary : (ok ? Color(nsColor: .systemGreen) : Color(nsColor: .systemOrange)))
         }
     }
 
@@ -973,7 +1166,7 @@ struct MainSettingsView: View {
         let automation = appDelegate.isFinderAutomationDenied ? "denied" : "not determined"
         let issues = appDelegate.activeIssues.map { $0.logText }.joined(separator: "; ")
         let report = """
-        WinFinder Pro \(versionText)
+        WinFinder Pro \(appVersionText())
         macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)
         Accessibility: \(accessibility)
         Event tap: \(appDelegate.eventTapState.rawValue)\(appDelegate.isPaused ? " (paused)" : "")
@@ -987,64 +1180,48 @@ struct MainSettingsView: View {
     private var shortcutGuideGroup: some View {
         GroupBox(label: Label(L10n.tr(appLanguage, "group.guide"), systemImage: "list.bullet.rectangle")) {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(shortcutRows, id: \.keys) { row in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(row.keys)
-                            .font(.system(.caption, design: .monospaced))
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.12))
-                            .cornerRadius(4)
-                        Text(row.description)
+                let rows = shortcutRows
+                if rows.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "keyboard")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        Text(L10n.tr(appLanguage, "guide.empty"))
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                        ForEach(rows, id: \.keys) { row in
+                            GridRow {
+                                Text(row.keys)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(Color.secondary.opacity(0.10)))
+                                    .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.22)))
+                                    .shadow(color: .black.opacity(0.10), radius: 0.5, y: 1)
+                                    .environment(\.layoutDirection, .leftToRight)
+                                Text(row.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
                     }
                 }
                 Text(L10n.tr(appLanguage, "guide.hint"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-            .padding(6)
         }
+        .groupBoxStyle(CardGroupBoxStyle())
     }
 
     private var shortcutRows: [(keys: String, description: String)] {
-        var rows: [(String, String)] = []
-        if enterToOpen {
-            rows.append(("Enter", L10n.tr(appLanguage, "cs.open")))
-        }
-        if backspaceUpFolder {
-            rows.append(("Delete", L10n.tr(appLanguage, "cs.parentFolder")))
-        } else if deleteToTrash {
-            rows.append(("Delete", L10n.tr(appLanguage, "cs.trash")))
-        }
-        if shiftDeletePermanent {
-            rows.append(("Shift + Delete", L10n.tr(appLanguage, "cs.permanentDelete")))
-        }
-        if cmdRRename {
-            rows.append(("Cmd + R  /  F2", L10n.tr(appLanguage, "cs.rename")))
-        }
-        if cutAndPaste {
-            rows.append(("Cmd + X  /  Cmd + V", L10n.tr(appLanguage, "cs.cutPaste")))
-        }
-        if altEnterProperties {
-            rows.append(("Alt + Enter", L10n.tr(appLanguage, "cs.properties")))
-        }
-        if altNavFolders {
-            rows.append(("Alt + ↑  /  Alt + ↓", L10n.tr(appLanguage, "cs.navUpDown")))
-            rows.append(("Alt + ←  /  Alt + →", L10n.tr(appLanguage, "cs.navBackForward")))
-        }
-        if f5Refresh {
-            rows.append(("F5", L10n.tr(appLanguage, "cs.refresh")))
-        }
-        if ctrlShortcuts {
-            rows.append(("Ctrl + C / X / V / Z / S / P / A / F / N / W / T / O", L10n.tr(appLanguage, "cs.ctrlLayer")))
-            rows.append(("Ctrl + L", L10n.tr(appLanguage, "cs.ctrlGoto")))
-            rows.append(("Ctrl + Shift + N", L10n.tr(appLanguage, "cs.ctrlNewFolder")))
-        }
-        return rows
+        activeShortcutRows(language: appLanguage)
     }
 
     // MARK: پابرگ
@@ -1059,29 +1236,103 @@ struct MainSettingsView: View {
                 NSApp.keyWindow?.close()
             }
             .buttonStyle(.bordered)
+            .keyboardShortcut(.cancelAction)
         }
         .padding()
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    func updateLaunchAtLogin(enabled: Bool) {
+    /// Applies a launch-at-login change off the main thread so the SMAppService
+    /// XPC round-trip cannot stutter the UI. The toggle moves optimistically
+    /// and reverts if the service rejects the change.
+    private func applyLaunchAtLogin(_ enabled: Bool) {
+        guard !isApplyingLoginChange else { return }
+        isApplyingLoginChange = true
         let previousValue = launchAtLogin
-
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
+        launchAtLogin = enabled
+        DispatchQueue.global(qos: .userInitiated).async {
+            var success = false
+            do {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+                success = true
+            } catch {
+                NSLog("WinFinder: launch-at-login update failed; previous state restored: \(error)")
             }
-
-            // Reflect the service's real state, including the approval-pending state.
-            launchAtLogin = LaunchAtLoginState.isRegistered
-        } catch {
-            // SMAppService can fail (for example, for an unsigned/unregistered app).
-            // Do not leave the toggle claiming a state that was not applied.
-            launchAtLogin = previousValue
-            NSLog("WinFinder: launch-at-login update failed; previous state restored: \(error)")
+            DispatchQueue.main.async {
+                isApplyingLoginChange = false
+                if success {
+                    // Reflect the service's real state, including the approval-pending state.
+                    launchAtLogin = LaunchAtLoginState.isRegistered
+                } else {
+                    launchAtLogin = previousValue
+                }
+            }
         }
+    }
+
+    // MARK: برون‌بری و درون‌ریزی تنظیمات
+
+    private static let exportableSettings: [(key: String, defaultValue: Bool)] = [
+        ("enterToOpen", true),
+        ("deleteToTrash", true),
+        ("shiftDeletePermanent", true),
+        ("cmdRRename", true),
+        ("cutAndPaste", true),
+        ("altEnterProperties", true),
+        ("altNavFolders", true),
+        ("f5Refresh", true),
+        ("backspaceUpFolder", false),
+        ("ctrlShortcuts", true),
+    ]
+
+    private func exportSettings() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "WinFinderSettings.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var payload: [String: Bool] = [:]
+        for entry in Self.exportableSettings {
+            payload[entry.key] = UserDefaults.standard.bool(forKey: entry.key)
+        }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: url, options: .atomic)
+        } catch {
+            NSLog("WinFinder: settings export failed: \(error)")
+        }
+    }
+
+    private func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let payload = try JSONSerialization.jsonObject(with: data) as? [String: Bool] ?? [:]
+            let knownKeys = Set(Self.exportableSettings.map { $0.key })
+            var applied = 0
+            for (key, value) in payload where knownKeys.contains(key) {
+                UserDefaults.standard.set(value, forKey: key)
+                applied += 1
+            }
+            if applied == 0 { showImportFailure() }
+        } catch {
+            NSLog("WinFinder: settings import failed: \(error)")
+            showImportFailure()
+        }
+    }
+
+    private func showImportFailure() {
+        let alert = NSAlert()
+        alert.messageText = L10n.tr(appLanguage, "settings.importFailed")
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }
 
@@ -1090,6 +1341,8 @@ struct ToggleRowItem: View {
     let title: String
     let subtitle: String
     @Binding var isOn: Bool
+    @State private var isHovering = false
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         HStack {
@@ -1099,10 +1352,65 @@ struct ToggleRowItem: View {
             }
             Spacer()
             Toggle("", isOn: $isOn)
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
+                .toggleStyle(.switch)
                 .labelsHidden()
+                .tint(Color("AccentColor"))
                 .accessibilityLabel(title)
                 .accessibilityHint(subtitle)
+                .help(subtitle)
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isHovering && isEnabled ? Color.secondary.opacity(0.07) : Color.clear)
+        )
+        .onHover { isHovering = $0 }
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
+    }
+}
+
+// MARK: - پنجره درباره
+struct AboutView: View {
+    @AppStorage("appLanguage") private var appLanguage = "en"
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+                .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+            VStack(spacing: 3) {
+                Text("WinFinder Pro")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Text(L10n.tr(appLanguage, "header.subtitle"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("\(L10n.tr(appLanguage, "header.version")) \(appVersionText())")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Divider()
+            Text(L10n.tr(appLanguage, "about.license"))
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button(L10n.tr(appLanguage, "about.github")) {
+                if let url = URL(string: "https://github.com/hamidreza-tn/WinFinder") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.bordered)
+            .help(L10n.tr(appLanguage, "about.github"))
+            Divider()
+            Text(L10n.tr(appLanguage, "footer.note"))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(width: 300)
+        .navigationTitle(L10n.tr(appLanguage, "about.title"))
+        .environment(\.layoutDirection, appLanguage == "fa" ? .rightToLeft : .leftToRight)
     }
 }

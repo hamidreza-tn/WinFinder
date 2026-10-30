@@ -1,5 +1,51 @@
 import SwiftUI
 
+// MARK: - زبان بصری مشترک وضعیت برنامه
+/// One source of truth for the status label and color, shared by the menu
+/// bar and the Settings header so the two never disagree.
+enum AppStatusPresentation {
+    static func label(isPaused: Bool, state: AppDelegate.EventTapState, language: String) -> String {
+        if isPaused { return L10n.tr(language, "header.paused") }
+        if state == .running { return L10n.tr(language, "header.active") }
+        return L10n.tr(language, "header.connecting")
+    }
+
+    static func color(isPaused: Bool, state: AppDelegate.EventTapState) -> Color {
+        // Semantic system colors: they follow the user's contrast and tint
+        // preferences instead of fixed RGB values.
+        if isPaused { return Color(nsColor: .systemGray) }
+        if state == .running { return Color(nsColor: .systemGreen) }
+        if state == .failed || state == .retrying { return Color(nsColor: .systemRed) }
+        return Color(nsColor: .systemOrange)
+    }
+}
+
+// MARK: - فهرست زنده میانبرهای فعال (نسخه فشرده برای منوبار)
+struct MenuBarShortcutsSection: View {
+    @AppStorage("appLanguage") private var appLanguage = "en"
+
+    var body: some View {
+        let rows = activeShortcutRows(language: appLanguage)
+        if rows.isEmpty {
+            Text(L10n.tr(appLanguage, "guide.empty"))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        } else {
+            ForEach(rows, id: \.keys) { row in
+                HStack {
+                    Text(row.keys)
+                        .font(.system(size: 11, design: .monospaced))
+                        .environment(\.layoutDirection, .leftToRight)
+                    Spacer()
+                    Text(row.description)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - آیکون منوبار بر اساس وضعیت برنامه
 struct MenuBarIconView: View {
     @ObservedObject var appDelegate: AppDelegate
@@ -46,49 +92,53 @@ struct MenuBarStatusView: View {
                 get: { !appDelegate.isPaused },
                 set: { appDelegate.setPaused(!$0) }
             ))
-            Button(L10n.tr(appLanguage, "menu.settings")) {
-                appDelegate.showSettingsWindow()
+            if !appDelegate.isPaused {
+                Button {
+                    appDelegate.pauseForOneHour()
+                } label: {
+                    Label(L10n.tr(appLanguage, "menu.pauseForHour"), systemImage: "clock.badge.pause")
+                }
             }
             Divider()
-            Button(L10n.tr(appLanguage, "menu.quit")) {
+            MenuBarShortcutsSection()
+            Divider()
+            Button {
+                appDelegate.showAboutWindow()
+            } label: {
+                Label(L10n.tr(appLanguage, "about.title"), systemImage: "info.circle")
+            }
+            Button {
+                appDelegate.showSettingsWindow()
+            } label: {
+                Label(L10n.tr(appLanguage, "menu.settings"), systemImage: "gearshape")
+            }
+            Divider()
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Label(L10n.tr(appLanguage, "menu.quit"), systemImage: "power")
             }
         }
         .environment(\.layoutDirection, appLanguage == "fa" ? .rightToLeft : .leftToRight)
     }
 
     private var statusRow: some View {
-        HStack {
-            Text(statusText)
+        let state = appDelegate.eventTapState
+        return HStack {
+            Text(AppStatusPresentation.label(
+                isPaused: appDelegate.isPaused,
+                state: state,
+                language: appLanguage
+            ))
             Circle()
-                .fill(statusColor)
+                .fill(AppStatusPresentation.color(isPaused: appDelegate.isPaused, state: state))
                 .frame(width: 8, height: 8)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(statusText)
-    }
-
-    private var isRunning: Bool {
-        appDelegate.isAccessGranted
-            && appDelegate.eventTapState == .running
-            && !appDelegate.isPaused
-    }
-
-    private var statusText: String {
-        if appDelegate.isPaused { return L10n.tr(appLanguage, "menu.status.paused") }
-        if isRunning { return L10n.tr(appLanguage, "menu.status.running") }
-        if appDelegate.eventTapState == .failed || appDelegate.eventTapState == .retrying {
-            return L10n.tr(appLanguage, "menu.status.error")
-        }
-        return L10n.tr(appLanguage, "menu.status.needsAccess")
-    }
-
-    private var statusColor: Color {
-        if appDelegate.isPaused { return .gray }
-        if isRunning { return .green }
-        if appDelegate.eventTapState == .failed || appDelegate.eventTapState == .retrying {
-            return .red
-        }
-        return .orange
+        .accessibilityLabel(AppStatusPresentation.label(
+            isPaused: appDelegate.isPaused,
+            state: state,
+            language: appLanguage
+        ))
     }
 }

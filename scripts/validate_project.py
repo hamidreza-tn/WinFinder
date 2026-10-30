@@ -40,8 +40,8 @@ makefile = read(MAKEFILE)
 
 # --- Build configuration -----------------------------------------------------
 require(project.count("MACOSX_DEPLOYMENT_TARGET = 13.0;") == 2, "deployment target must be 13.0 in Debug and Release")
-require(project.count("MARKETING_VERSION = 2.4;") == 2, "marketing version must be 2.4 in Debug and Release")
-require(project.count("CURRENT_PROJECT_VERSION = 6;") == 2, "build number must be 6 in Debug and Release")
+require(project.count("MARKETING_VERSION = 2.5;") == 2, "marketing version must be 2.5 in Debug and Release")
+require(project.count("CURRENT_PROJECT_VERSION = 7;") == 2, "build number must be 7 in Debug and Release")
 require(project.count("GENERATE_INFOPLIST_FILE = NO;") == 2, "explicit Info.plist must be used")
 require(project.count("INFOPLIST_FILE = Config/WinFinder-Info.plist;") == 2, "custom Info.plist is missing")
 require(project.count("PRODUCT_BUNDLE_IDENTIFIER = com.winfinderpro.app;") == 2, "bundle identifier must be the neutral public one")
@@ -61,17 +61,24 @@ for workflow in ("build.yml", "release.yml"):
 # contain the literal it is looking for.
 personal_marker = "ha" + "mid"
 old_bundle_marker = "com." + personal_marker
+# The public repository URL is identity by design (badges, clone links, the
+# About window); it is stripped before scanning so only genuinely personal
+# markers trip the check.
+public_repo_url = ("github.com/" + personal_marker + "reza-tn/WinFinder").lower()
+def scanned_text(path: Path) -> str:
+    return read(path).lower().replace(public_repo_url, "")
+
 # Code and configuration must never contain the personal marker at all.
 code_files = [PROJECT, MAIN_SOURCE, LOGIC_SOURCE, MENU_SOURCE, SETTINGS_SOURCE, INFO_PLIST, MAKEFILE,
               ROOT / "scripts" / "validate_project.py", ROOT / "scripts" / "test_project.py",
               ROOT / "scripts" / "logic_tests" / "main.swift",
               ROOT / ".github" / "workflows" / "build.yml", ROOT / ".github" / "workflows" / "release.yml"]
 for text_file in code_files:
-    require(personal_marker not in read(text_file).lower(), f"personal information found in {text_file.name}")
+    require(personal_marker not in scanned_text(text_file), f"personal information found in {text_file.name}")
 # Documentation may legitimately reference the public repository owner
 # (badges, clone URLs); only the old personal bundle identifier is forbidden.
 for text_file in [ROOT / "README.md", ROOT / "CONTRIBUTING.md", ROOT / "LICENSE"]:
-    require(old_bundle_marker not in read(text_file).lower(), f"old personal bundle identifier found in {text_file.name}")
+    require(old_bundle_marker not in scanned_text(text_file), f"old personal bundle identifier found in {text_file.name}")
 
 # --- Ad-hoc code signing -----------------------------------------------------
 require("CODE_SIGN_IDENTITY=-" in makefile, "builds must be ad-hoc signed (CODE_SIGN_IDENTITY=-)")
@@ -126,6 +133,12 @@ require("appLanguage" in settings_source, "in-app language switcher is missing")
 require("supportedLanguages" in settings_source, "language list is missing")
 require("diag.copyreport" in settings_source, "diagnostics copy-report control is missing")
 require("delete.inactiveHint" in settings_source, "the overridden trash toggle must say so")
+require("perm.title" in settings_source, "the permissions group must have a short title")
+require("TabView" in settings_source, "the settings window must use a tabbed layout")
+require("CardGroupBoxStyle" in settings_source, "settings groups must use the card style")
+require("showAboutWindow" in main_source, "the menu bar must expose an About window")
+require("pauseForOneHour" in main_source, "the menu bar must offer a timed pause")
+require("layoutDirection, .leftToRight" in settings_source and "layoutDirection, .leftToRight" in menu_source, "keycap chips must be forced LTR")
 
 # --- Localization completeness ----------------------------------------------
 # Every language table must define exactly the same key set as English, and

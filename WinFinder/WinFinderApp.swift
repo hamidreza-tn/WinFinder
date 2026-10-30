@@ -14,6 +14,11 @@ struct WinFinderApp: App {
             MainSettingsView()
                 .environmentObject(appDelegate)
         }
+        .windowResizability(.contentMinSize)
+
+        Window(L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "about.title"), id: "about") {
+            AboutView()
+        }
         .windowResizability(.contentSize)
 
         MenuBarExtra {
@@ -62,7 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /// User-visible issue categories. Raw technical messages go to the log;
     /// the UI shows a localized explanation with a fix-it action.
-    enum AppIssue: Equatable {
+    enum AppIssue: Hashable {
         case eventTapCreation(String)
         case finderAutomationDenied
         case finderRefreshFailed(String)
@@ -95,6 +100,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // whole system's keyboard input must not stall with it.
     private var tapThread: Thread?
     private let tapRunLoop = TapRunLoopHolder()
+
+    // Pending auto-resume for the "pause for an hour" menu action.
+    private var scheduledResumeWorkItem: DispatchWorkItem?
 
     // Kernel-held single-instance lock (flock): released automatically when
     // the process dies, so there is no stale-lock state and no TOCTOU window.
@@ -221,6 +229,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isStopping = true
         permissionPollTimer?.invalidate()
         tapRetryWorkItem?.cancel()
+        scheduledResumeWorkItem?.cancel()
         stopKeyInterceptor()
     }
 
@@ -314,19 +323,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// front despite the accessory activation policy.
     func showSettingsWindow() {
         if Thread.isMainThread {
-            performShowSettingsWindow()
+            performShowWindow(id: "main-settings")
         } else {
-            DispatchQueue.main.async { [weak self] in self?.performShowSettingsWindow() }
+            DispatchQueue.main.async { [weak self] in self?.performShowWindow(id: "main-settings") }
         }
     }
 
-    private func performShowSettingsWindow() {
+    /// Opens the small About window from the menu bar.
+    func showAboutWindow() {
+        if Thread.isMainThread {
+            performShowWindow(id: "about")
+        } else {
+            DispatchQueue.main.async { [weak self] in self?.performShowWindow(id: "about") }
+        }
+    }
+
+    private func performShowWindow(id: String) {
         if let action = openWindowAction {
-            action(id: "main-settings")
-        } else if let window = NSApp.windows.first(where: { $0.title == L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title") }) {
+            action(id: id)
+        } else if id == "main-settings",
+                  let window = NSApp.windows.first(where: { $0.title == L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title") }) {
             window.makeKeyAndOrderFront(nil)
         } else {
-            NSLog("WinFinder: cannot open the settings window (no open-window action registered yet)")
+            NSLog("WinFinder: cannot open window '\(id)' (no open-window action registered yet)")
             return
         }
         Self.activateApp()
@@ -340,8 +359,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if paused {
             stopKeyInterceptor()
         } else {
+            scheduledResumeWorkItem?.cancel()
+            scheduledResumeWorkItem = nil
             checkAccessSilently()
         }
+    }
+
+    /// Menu-bar convenience: pause now and resume automatically after an hour.
+    func pauseForOneHour() {
+        setPaused(true)
+        scheduledResumeWorkItem?.cancel()
+        let resume = DispatchWorkItem { [weak self] in
+            self?.setPaused(false)
+        }
+        scheduledResumeWorkItem = resume
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3600, execute: resume)
     }
 
     /// True when an in-place tap re-enable is still allowed. Consecutive
