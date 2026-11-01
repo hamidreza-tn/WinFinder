@@ -40,8 +40,8 @@ makefile = read(MAKEFILE)
 
 # --- Build configuration -----------------------------------------------------
 require(project.count("MACOSX_DEPLOYMENT_TARGET = 13.0;") == 2, "deployment target must be 13.0 in Debug and Release")
-require(project.count("MARKETING_VERSION = 2.5;") == 2, "marketing version must be 2.5 in Debug and Release")
-require(project.count("CURRENT_PROJECT_VERSION = 7;") == 2, "build number must be 7 in Debug and Release")
+require(project.count("MARKETING_VERSION = 2.5.1;") == 2, "marketing version must be 2.5.1 in Debug and Release")
+require(project.count("CURRENT_PROJECT_VERSION = 8;") == 2, "build number must be 8 in Debug and Release")
 require(project.count("GENERATE_INFOPLIST_FILE = NO;") == 2, "explicit Info.plist must be used")
 require(project.count("INFOPLIST_FILE = Config/WinFinder-Info.plist;") == 2, "custom Info.plist is missing")
 require(project.count("PRODUCT_BUNDLE_IDENTIFIER = com.winfinderpro.app;") == 2, "bundle identifier must be the neutral public one")

@@ -108,11 +108,61 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // the process dies, so there is no stale-lock state and no TOCTOU window.
     private var singleInstanceFD: Int32 = -1
 
-    // Launch-source detection: a user launch (Finder, Dock, `open`) delivers
-    // the open-application Apple Event; a login-item launch does not. Used to
-    // keep login launches a quiet menu-bar agent without a settings window.
+    // Launch-source detection. AppKit's NSApplicationLaunchIsDefaultLaunchKey
+    // in the didFinishLaunching userInfo is the authoritative signal: false
+    // means the system launched the app (login item, session restore), true
+    // means a user launch. The open-application Apple Event alone is NOT
+    // proof of a user launch — LaunchServices delivers it to login-item
+    // launches too — so it only serves as a fallback when the flag is absent.
     private var receivedOpenApplicationEvent = false
+    private var defaultLaunchFlag: Bool?
     private(set) var isLaunchedAtLogin = false
+
+    /// True while this launch is still best classified as a system (login)
+    /// launch. Re-evaluated live so a late Apple Event can flip the verdict.
+    private var treatsLaunchAsLogin: Bool {
+        switch defaultLaunchFlag {
+        case .some(false):
+            // AppKit says the system launched us: authoritative.
+            return true
+        case .some(true):
+            // The flag can miss SMAppService login launches; the
+            // session-age heuristic catches those.
+            return launchedWithinSecondsOfSessionStart
+        case .none:
+            // Key absent (should not happen): fall back to the legacy
+            // open-application heuristic, and let the session-age check
+            // override it as well.
+            return !receivedOpenApplicationEvent || launchedWithinSecondsOfSessionStart
+        }
+    }
+
+    /// A real login-item launch starts within seconds of the user
+    /// session's Finder, while a deliberate user launch happens minutes or
+    /// hours later. Finder not running yet is itself evidence of a
+    /// session-start launch: no user could have double-clicked the app
+    /// before Finder existed.
+    private var launchedWithinSecondsOfSessionStart: Bool {
+        guard let ourStart = NSRunningApplication.current.launchDate else {
+            return false
+        }
+        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first,
+              let finderStart = finder.launchDate else {
+            return true
+        }
+        let delta = ourStart.timeIntervalSince(finderStart)
+        return delta > -10 && delta < 30
+    }
+
+    /// Set when the user explicitly asks for a window (menu bar, Apple
+    /// Event). Launch-time suppression must never close a window the user
+    /// deliberately opened.
+    private var userRequestedSettingsWindow = false
+
+    /// Brief poll that keeps suppressing the settings window right after a
+    /// login launch: the SwiftUI Window scene is created asynchronously and
+    /// may be ordered front a few run-loop turns after didFinishLaunching.
+    private var launchSuppressionTimer: Timer?
 
     // SwiftUI's openWindow action captured from the menu-bar icon view, so the
     // delegate can open the settings scene outside the SwiftUI hierarchy.
@@ -137,6 +187,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     @objc private func handleOpenApplicationEvent(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
         receivedOpenApplicationEvent = true
+        // This event is delivered to login-item launches too, and during
+        // app launch it is dispatched before didFinishLaunching has set the
+        // default-launch flag and before the SwiftUI scene exists — so it
+        // must not decide the window here. The 0.6 s launch-context
+        // decision shows the settings window for user launches. Later
+        // events (re-activating an already-running agent) do have the full
+        // context and may show it.
+        guard !treatsLaunchAsLogin else { return }
+        guard openWindowAction != nil
+                || NSApp.windows.contains(where: { $0.title == Self.settingsWindowTitle }) else { return }
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.title == Self.settingsWindowTitle }) {
+            showSettingsWindow()
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -144,6 +207,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         guard acquireSingleInstanceLock() else {
             DispatchQueue.main.async { NSApp.terminate(nil) }
             return
+        }
+
+        // Launch-source decision first: everything below depends on it.
+        defaultLaunchFlag = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool
+
+        // Launch-time suppression for login launches: SwiftUI may order the
+        // first Window scene front during or shortly after finishLaunching,
+        // so close it synchronously now — before the run loop services the
+        // window server — and keep suppressing briefly.
+        closeAutoOpenedSettingsWindow()
+        if treatsLaunchAsLogin {
+            beginLaunchWindowSuppression()
         }
 
         let defaults = UserDefaults.standard
@@ -214,6 +289,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     deinit {
         permissionPollTimer?.invalidate()
+        launchSuppressionTimer?.invalidate()
         tapRetryWorkItem?.cancel()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
@@ -228,6 +304,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationWillTerminate(_ notification: Notification) {
         isStopping = true
         permissionPollTimer?.invalidate()
+        launchSuppressionTimer?.invalidate()
         tapRetryWorkItem?.cancel()
         scheduledResumeWorkItem?.cancel()
         stopKeyInterceptor()
@@ -277,12 +354,40 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // MARK: تشخیص اجرای هنگام لاگین و آموزش اولیه
 
+    /// Localized title of the settings window, used to recognize it among
+    /// NSApp.windows from AppKit context.
+    static var settingsWindowTitle: String {
+        L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title")
+    }
+
+    /// Suppresses the settings window for a short grace period after a
+    /// login launch. Stops early if the launch turns out to be a user
+    /// launch (a late Apple Event or a pending user request), or after
+    /// two seconds — SwiftUI creates its launch windows within the first
+    /// run-loop turns, never later.
+    private func beginLaunchWindowSuppression() {
+        NSLog("WinFinder: login launch detected; suppressing the settings window")
+        var polls = 0
+        launchSuppressionTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            polls += 1
+            if !self.treatsLaunchAsLogin || self.userRequestedSettingsWindow || polls >= 40 {
+                timer.invalidate()
+                self.launchSuppressionTimer = nil
+                return
+            }
+            self.closeAutoOpenedSettingsWindow()
+        }
+    }
+
     private func finishLaunchContextDecision() {
-        isLaunchedAtLogin = !receivedOpenApplicationEvent
-        let settingsTitle = L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title")
-        let settingsWindowVisible = NSApp.windows.contains { $0.isVisible && $0.title == settingsTitle }
+        isLaunchedAtLogin = treatsLaunchAsLogin
+        let settingsWindowVisible = NSApp.windows.contains { $0.isVisible && $0.title == Self.settingsWindowTitle }
         if isLaunchedAtLogin {
-            NSLog("WinFinder: launched at login (no open-application event); suppressing settings window")
+            NSLog("WinFinder: launched at login (default-launch flag or event heuristic); suppressing settings window")
             closeAutoOpenedSettingsWindow()
         } else {
             NSLog("WinFinder: user launch detected")
@@ -291,8 +396,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 // cannot do its job: ask for the permission right away.
                 requestAccessManually()
             }
-            // SwiftUI does not auto-open Window scenes in a menu-bar agent, so
-            // a user launch must show the settings window explicitly.
+            // SwiftUI does not auto-open Window scenes in a menu-bar agent,
+            // so a user launch must show the settings window explicitly.
             if !settingsWindowVisible {
                 showSettingsWindow()
             }
@@ -300,7 +405,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func closeAutoOpenedSettingsWindow() {
-        let title = L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title")
+        let title = Self.settingsWindowTitle
         for window in NSApp.windows where window.isVisible && window.title == title {
             window.close()
         }
@@ -339,10 +444,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func performShowWindow(id: String) {
+        userRequestedSettingsWindow = true
         if let action = openWindowAction {
             action(id: id)
         } else if id == "main-settings",
-                  let window = NSApp.windows.first(where: { $0.title == L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title") }) {
+                  let window = NSApp.windows.first(where: { $0.title == Self.settingsWindowTitle }) {
             window.makeKeyAndOrderFront(nil)
         } else {
             NSLog("WinFinder: cannot open window '\(id)' (no open-window action registered yet)")

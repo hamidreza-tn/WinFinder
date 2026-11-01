@@ -39,7 +39,7 @@ key stays single-shot.
 
 | File | Responsibility |
 | --- | --- |
-| `WinFinder/WinFinderApp.swift` | `@main` scenes, `AppDelegate`: lifecycle, event tap thread, permissions, launch-source detection (Apple Event `oapp`), single-instance flock, pause, issues |
+| `WinFinder/WinFinderApp.swift` | `@main` scenes, `AppDelegate`: lifecycle, event tap thread, permissions, launch-source detection (`launchIsDefaultUserInfoKey` + session-age heuristic), single-instance flock, pause, issues |
 | `WinFinder/ShortcutLogic.swift` | Pure shortcut resolver, `ShortcutSettings`, `CutState`, `KeySimulator`, `TextEditingDetector`, `FinderAutomation`, `TapRunLoopHolder` |
 | `WinFinder/MenuBarViews.swift` | Menu bar icon (state-aware) and menu |
 | `WinFinder/SettingsViews.swift` | Settings UI, all six `L10n` tables, diagnostics, deep links |
