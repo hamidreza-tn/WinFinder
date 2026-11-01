@@ -40,8 +40,8 @@ makefile = read(MAKEFILE)
 
 # --- Build configuration -----------------------------------------------------
 require(project.count("MACOSX_DEPLOYMENT_TARGET = 13.0;") == 2, "deployment target must be 13.0 in Debug and Release")
-require(project.count("MARKETING_VERSION = 2.5.1;") == 2, "marketing version must be 2.5.1 in Debug and Release")
-require(project.count("CURRENT_PROJECT_VERSION = 8;") == 2, "build number must be 8 in Debug and Release")
+require(project.count("MARKETING_VERSION = 2.5.2;") == 2, "marketing version must be 2.5.2 in Debug and Release")
+require(project.count("CURRENT_PROJECT_VERSION = 9;") == 2, "build number must be 9 in Debug and Release")
 require(project.count("GENERATE_INFOPLIST_FILE = NO;") == 2, "explicit Info.plist must be used")
 require(project.count("INFOPLIST_FILE = Config/WinFinder-Info.plist;") == 2, "custom Info.plist is missing")
 require(project.count("PRODUCT_BUNDLE_IDENTIFIER = com.winfinderpro.app;") == 2, "bundle identifier must be the neutral public one")
@@ -70,6 +70,7 @@ def scanned_text(path: Path) -> str:
 
 # Code and configuration must never contain the personal marker at all.
 code_files = [PROJECT, MAIN_SOURCE, LOGIC_SOURCE, MENU_SOURCE, SETTINGS_SOURCE, INFO_PLIST, MAKEFILE,
+              ROOT / "scripts" / "build_dmg.sh", ROOT / "scripts" / "make_dmg_background.swift",
               ROOT / "scripts" / "validate_project.py", ROOT / "scripts" / "test_project.py",
               ROOT / "scripts" / "logic_tests" / "main.swift",
               ROOT / ".github" / "workflows" / "build.yml", ROOT / ".github" / "workflows" / "release.yml"]

@@ -7,7 +7,7 @@ APP := $(DERIVED_DATA)/Build/Products/$(CONFIGURATION)/WinFinder.app
 INSTALL_DIR ?= /Applications
 INSTALLED_APP := $(INSTALL_DIR)/WinFinder.app
 
-.PHONY: validate test-logic build test archive install clean
+.PHONY: validate test-logic build test archive install dmg clean
 
 validate:
 	./scripts/validate_project.py
@@ -39,6 +39,13 @@ install: build
 	-@pkill -x WinFinder 2>/dev/null || true
 	rm -rf "$(INSTALLED_APP)"
 	ditto "$(APP)" "$(INSTALLED_APP)"
+
+# Drag-to-Install DMG with the branded background. Requires the background
+# artwork (scripts/dmg/background.png); regenerate it with
+# `swift scripts/make_dmg_background.swift scripts/dmg/background.png`.
+dmg: CONFIGURATION = Release
+dmg: build
+	bash scripts/build_dmg.sh "$(APP)"
 
 clean:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -derivedDataPath $(DERIVED_DATA) clean

@@ -44,12 +44,16 @@ jobs:
             .build/Build/Products/Release/WinFinder.app \
             "WinFinder-${GITHUB_REF_NAME}.zip"
 
+      - name: Build installer DMG
+        run: bash scripts/build_dmg.sh
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
             "WinFinder-${GITHUB_REF_NAME}.zip" \
+            "WinFinder-${GITHUB_REF_NAME#v}.dmg" \
             --repo "$GITHUB_REPOSITORY" \
             --title "WinFinder $GITHUB_REF_NAME" \
             --generate-notes
