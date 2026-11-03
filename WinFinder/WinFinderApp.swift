@@ -69,6 +69,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// the UI shows a localized explanation with a fix-it action.
     enum AppIssue: Hashable {
         case eventTapCreation(String)
+        case syntheticKeyFailed(String)
         case finderAutomationDenied
         case finderRefreshFailed(String)
     }
@@ -79,6 +80,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var activeIssues: [AppIssue] = []
     @Published private(set) var isFinderAutomationDenied = false
     @Published private(set) var isPaused = false
+    @Published private(set) var isCutPending = false
+    /// The moment a timed pause ("pause for one hour") will resume, or nil
+    /// when the pause is indefinite or the app is running.
+    @Published private(set) var pausedUntil: Date?
 
     private var permissionPollTimer: Timer?
     private var permissionPollAttempts = 0
@@ -107,6 +112,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // Kernel-held single-instance lock (flock): released automatically when
     // the process dies, so there is no stale-lock state and no TOCTOU window.
     private var singleInstanceFD: Int32 = -1
+
+    // Cached shortcut toggles: the tap callback reads one lock-guarded
+    // snapshot instead of touching UserDefaults on every keystroke. The cache
+    // is refreshed whenever the defaults database changes.
+    private static let settingsCacheLock = NSLock()
+    private static var settingsCache = ShortcutSettings()
+
+    private static func refreshSettingsCache() {
+        let fresh = ShortcutSettings(defaults: .standard)
+        settingsCacheLock.lock()
+        settingsCache = fresh
+        settingsCacheLock.unlock()
+    }
+
+    static func cachedShortcutSettings() -> ShortcutSettings {
+        settingsCacheLock.lock()
+        defer { settingsCacheLock.unlock() }
+        return settingsCache
+    }
 
     // Launch-source detection. AppKit's NSApplicationLaunchIsDefaultLaunchKey
     // in the didFinishLaunching userInfo is the authoritative signal: false
@@ -196,8 +220,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // context and may show it.
         guard !treatsLaunchAsLogin else { return }
         guard openWindowAction != nil
-                || NSApp.windows.contains(where: { $0.title == Self.settingsWindowTitle }) else { return }
-        if !NSApp.windows.contains(where: { $0.isVisible && $0.title == Self.settingsWindowTitle }) {
+                || NSApp.windows.contains(where: Self.isSettingsWindow) else { return }
+        if !NSApp.windows.contains(where: { $0.isVisible && Self.isSettingsWindow($0) }) {
             showSettingsWindow()
         }
     }
@@ -225,20 +249,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let hadPersistentLaunchAtLoginPreference =
             defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?["launchAtLogin"] != nil
 
-        defaults.register(defaults: [
-            "enterToOpen": true,
-            "deleteToTrash": true,
-            "shiftDeletePermanent": true,
-            "cmdRRename": true,
-            "cutAndPaste": true,
-            "altEnterProperties": true,
-            "altNavFolders": true,
-            "f5Refresh": true,
-            "backspaceUpFolder": false,
-            "ctrlShortcuts": true,
-            "launchAtLogin": true,
-            "appLanguage": "en"
-        ])
+        // Shortcut toggles come from the single default table in
+        // ShortcutSettings; only the two system-level keys are listed here.
+        var registeredDefaults = ShortcutSettings.defaultValues
+        registeredDefaults["launchAtLogin"] = true
+        registeredDefaults["appLanguage"] = "en"
+        defaults.register(defaults: registeredDefaults)
+
+        // Prime the tap-thread settings cache before the event tap can start.
+        Self.refreshSettingsCache()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(defaultsChanged),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(cutStateChanged),
+            name: CutState.didChangeNotification,
+            object: nil
+        )
 
         // New installations should behave like a normal menu-bar utility and
         // start at login. An existing explicit opt-out is respected.
@@ -354,10 +385,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     // MARK: تشخیص اجرای هنگام لاگین و آموزش اولیه
 
-    /// Localized title of the settings window, used to recognize it among
-    /// NSApp.windows from AppKit context.
-    static var settingsWindowTitle: String {
+    /// Localized title of the settings window, kept only as a fallback for
+    /// window recognition before the SwiftUI scene installs its identifier.
+    /// Nonisolated: Apple Event delegate methods run outside the actor pool.
+    nonisolated static var settingsWindowTitle: String {
         L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title")
+    }
+
+    /// Recognizes the settings window by its stable identifier, falling back
+    /// to the localized title for the brief moment before SwiftUI attaches
+    /// the WindowIdentifierSetter background view. Titles change with the
+    /// interface language, so the identifier is the authoritative match.
+    nonisolated static func isSettingsWindow(_ window: NSWindow) -> Bool {
+        window.identifier == WinFinderWindowID.settings || window.title == settingsWindowTitle
     }
 
     /// Suppresses the settings window for a short grace period after a
@@ -385,7 +425,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     private func finishLaunchContextDecision() {
         isLaunchedAtLogin = treatsLaunchAsLogin
-        let settingsWindowVisible = NSApp.windows.contains { $0.isVisible && $0.title == Self.settingsWindowTitle }
+        let settingsWindowVisible = NSApp.windows.contains { $0.isVisible && Self.isSettingsWindow($0) }
         if isLaunchedAtLogin {
             NSLog("WinFinder: launched at login (default-launch flag or event heuristic); suppressing settings window")
             closeAutoOpenedSettingsWindow()
@@ -405,8 +445,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func closeAutoOpenedSettingsWindow() {
-        let title = Self.settingsWindowTitle
-        for window in NSApp.windows where window.isVisible && window.title == title {
+        for window in NSApp.windows where window.isVisible && Self.isSettingsWindow(window) {
             window.close()
         }
     }
@@ -448,7 +487,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if let action = openWindowAction {
             action(id: id)
         } else if id == "main-settings",
-                  let window = NSApp.windows.first(where: { $0.title == Self.settingsWindowTitle }) {
+                  let window = NSApp.windows.first(where: Self.isSettingsWindow) {
             window.makeKeyAndOrderFront(nil)
         } else {
             NSLog("WinFinder: cannot open window '\(id)' (no open-window action registered yet)")
@@ -465,6 +504,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if paused {
             stopKeyInterceptor()
         } else {
+            pausedUntil = nil
             scheduledResumeWorkItem?.cancel()
             scheduledResumeWorkItem = nil
             checkAccessSilently()
@@ -474,6 +514,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// Menu-bar convenience: pause now and resume automatically after an hour.
     func pauseForOneHour() {
         setPaused(true)
+        pausedUntil = Date().addingTimeInterval(3600)
         scheduledResumeWorkItem?.cancel()
         let resume = DispatchWorkItem { [weak self] in
             self?.setPaused(false)
@@ -532,6 +573,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             return nil
         }
         return entry.decision.intercepted
+    }
+
+    @objc private func defaultsChanged() {
+        // Fires on the thread that made the change (the main thread for
+        // @AppStorage writes); refresh is lock-guarded and safe anywhere.
+        Self.refreshSettingsCache()
+    }
+
+    @objc private func cutStateChanged() {
+        DispatchQueue.main.async { [weak self] in
+            self?.isCutPending = CutState.shared.active
+        }
     }
 
     @objc func handleWake() {
@@ -714,7 +767,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             CutState.shared.clear()
         }
 
-        let settings = ShortcutSettings(defaults: .standard)
+        let settings = Self.cachedShortcutSettings()
         guard let action = ShortcutResolver.action(for: keyCode, flags: flags, settings: settings) else {
             return Unmanaged.passUnretained(event)
         }
@@ -766,7 +819,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 CutState.shared.clear()
             }
             if !KeySimulator.post(keyCode: syntheticKeyCode, flags: syntheticFlags) {
-                AppDelegate.shared?.reportIssue(.eventTapCreation("Could not create synthetic key event for key code \(syntheticKeyCode)"))
+                AppDelegate.shared?.reportIssue(.syntheticKeyFailed("key code \(syntheticKeyCode)"))
                 return Unmanaged.passUnretained(event)
             }
         case .beginCut:
@@ -884,6 +937,8 @@ extension AppDelegate.AppIssue {
         switch self {
         case .eventTapCreation(let message):
             return message
+        case .syntheticKeyFailed(let message):
+            return "Could not post the synthetic key event: \(message)"
         case .finderAutomationDenied:
             return "Finder refresh denied: Apple Events permission missing (-1743)"
         case .finderRefreshFailed(let message):

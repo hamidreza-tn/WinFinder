@@ -22,6 +22,8 @@ func resolve(_ keyCode: Int64, _ flags: CGEventFlags, _ settings: ShortcutSettin
 // MARK: - Enter / properties
 
 expect(resolve(36, []) == .synthesizeKey(keyCode: 125, flags: .maskCommand), "Enter opens via Cmd+Down")
+expect(resolve(76, []) == .synthesizeKey(keyCode: 125, flags: .maskCommand), "Numpad Enter opens via Cmd+Down")
+expect(resolve(76, .maskAlternate) == .synthesizeKey(keyCode: 34, flags: .maskCommand), "Alt+Numpad Enter opens Get Info")
 expect(resolve(36, .maskCommand) == nil, "Cmd+Enter is untouched")
 expect(resolve(36, .maskShift) == nil, "Shift+Enter is untouched")
 expect(resolve(36, .maskAlternate) == .synthesizeKey(keyCode: 34, flags: .maskCommand), "Alt+Enter opens Get Info (Cmd+I)")
@@ -124,11 +126,45 @@ cut4.mark()
 cut4.clear()
 expect(!cut4.consume(currentChangeCount: 5), "a cleared cut cannot be consumed")
 
+let cut5 = CutState()
+expect(!cut5.active, "a fresh cut state is not active")
+cut5.mark()
+expect(cut5.active, "marking a cut makes the state active")
+cut5.clear()
+expect(!cut5.active, "clearing a cut makes the state inactive")
+
 // MARK: - Watched keys
 
-for keyCode in [Int64(0), 1, 3, 6, 7, 8, 9, 13, 15, 17, 31, 35, 36, 37, 45, 51, 96, 120, 123, 124, 125, 126] {
+for keyCode in [Int64(0), 1, 3, 6, 7, 8, 9, 13, 15, 17, 31, 35, 36, 37, 45, 51, 76, 96, 120, 123, 124, 125, 126] {
     expect(ShortcutResolver.watchedKeys.contains(keyCode), "key \(keyCode) is watched")
 }
+
+// MARK: - Single source of defaults
+
+// Every toggle in the compiled-in struct must appear exactly once in the
+// shared defaults table, and the table's values must match the struct's own
+// memberwise defaults — otherwise registration, reset, and export drift apart.
+let snapshot = ShortcutSettings()
+let structDefaults: [String: Bool] = [
+    "enterToOpen": snapshot.enterToOpen,
+    "deleteToTrash": snapshot.deleteToTrash,
+    "shiftDeletePermanent": snapshot.shiftDeletePermanent,
+    "cmdRRename": snapshot.cmdRRename,
+    "cutAndPaste": snapshot.cutAndPaste,
+    "altEnterProperties": snapshot.altEnterProperties,
+    "altNavFolders": snapshot.altNavFolders,
+    "f5Refresh": snapshot.f5Refresh,
+    "backspaceUpFolder": snapshot.backspaceUpFolder,
+    "ctrlShortcuts": snapshot.ctrlShortcuts,
+]
+expect(ShortcutSettings.keysAndDefaults.count == structDefaults.count,
+       "the defaults table covers every shortcut toggle")
+for entry in ShortcutSettings.keysAndDefaults {
+    expect(structDefaults[entry.key] == entry.value,
+           "default value for '\(entry.key)' matches the compiled-in struct default")
+}
+let allTableKeys = ShortcutSettings.keysAndDefaults.map { $0.key }
+expect(Set(allTableKeys).count == allTableKeys.count, "the defaults table has no duplicate keys")
 
 // MARK: - Finder refresh outcome classification
 

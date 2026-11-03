@@ -68,6 +68,11 @@ struct MenuBarIconView: View {
         if !appDelegate.isAccessGranted {
             return "exclamationmark.triangle.fill"
         }
+        // A pending cut gets its own hint so the user knows the next Cmd+V
+        // will move (Finder offers no visual highlight for cut items).
+        if appDelegate.isCutPending {
+            return "scissors"
+        }
         switch appDelegate.eventTapState {
         case .running:
             return "keyboard.fill"
@@ -87,6 +92,12 @@ struct MenuBarStatusView: View {
     var body: some View {
         Group {
             statusRow
+            pausedUntilRow
+            if appDelegate.isCutPending && !appDelegate.isPaused {
+                Text(L10n.tr(appLanguage, "cut.pending"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             Divider()
             Toggle(L10n.tr(appLanguage, "menu.shortcutsEnabled"), isOn: Binding(
                 get: { !appDelegate.isPaused },
@@ -140,5 +151,17 @@ struct MenuBarStatusView: View {
             state: state,
             language: appLanguage
         ))
+    }
+
+    /// Shown while a timed pause is running, so the user knows when the
+    /// shortcuts will come back ("Paused until 15:30").
+    @ViewBuilder
+    private var pausedUntilRow: some View {
+        if let until = appDelegate.pausedUntil {
+            Text(L10n.tr(appLanguage, "menu.pausedUntil")
+                .replacingOccurrences(of: "%@", with: until.formatted(date: .omitted, time: .shortened)))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
     }
 }

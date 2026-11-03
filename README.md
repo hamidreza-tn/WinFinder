@@ -33,7 +33,7 @@ and SwiftUI.
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> cut & paste | ✔ <kbd>⌘X</kbd> cuts and <kbd>⌘V</kbd> moves, like Windows |
 | <kbd>Alt</kbd>+<kbd>Enter</kbd> shows properties | ✔ Opens Get Info |
 | <kbd>Backspace</kbd> / <kbd>Alt</kbd>+<kbd>↑↓←→</kbd> navigate | ✔ Up / open / back / forward (all four directions) |
-| <kbd>F5</kbd> refreshes | ✔ Refreshes the active Finder window |
+| <kbd>F5</kbd> refreshes | ✔ Refreshes the active Finder window (or the desktop when no window is open) |
 
 Plus an optional **Windows Ctrl layer** that maps your Windows <kbd>Ctrl</kbd>
 habits onto their <kbd>⌘</kbd> equivalents — <kbd>Ctrl</kbd>+<kbd>C</kbd>,
@@ -50,10 +50,14 @@ A few behaviors cannot match Windows exactly on macOS; they are deliberate:
 - **Shift+Delete asks for confirmation** — it triggers macOS's own
   "Delete Immediately" dialog, which always confirms.
 - **Cut has no visual highlight** — Finder offers no public API to gray out
-  cut items the way Explorer does.
+  cut items the way Explorer does. WinFinder compensates with a pending-cut
+  hint: the menu-bar icon switches to a scissors symbol and the menu shows
+  *"Cut pending — press Cmd+V to move"* until you paste.
 - **Cut with nothing selected** leaves the previous clipboard content in
   place; a later paste then moves that older content (Windows pastes it as a
   copy instead).
+- **⌘R starts a rename**, which shadows Finder's "Show Original" command for
+  aliases (use the context menu for that rare case).
 
 ## Compatibility
 
@@ -62,6 +66,9 @@ the event system, BetterTouchTool/Keyboard Maestro above it), but installing
 more than one tool that remaps the same keys in Finder can still cause double
 remapping. If shortcuts behave strangely, pause WinFinder from the menu bar to
 isolate the conflict.
+
+Released builds are **universal binaries** — they run natively on both Apple
+Silicon and Intel Macs.
 
 ## Troubleshooting
 
@@ -94,7 +101,8 @@ are active.
 - 🌐 **6 interface languages** — English, Español, Français, 简体中文, हिन्दी,
   فارسی (with full RTL layout for Persian)
 - 🚦 **Menu bar control** — status icon, one-click pause/resume (or pause for
-  an hour), a live list of active shortcuts, Settings, About, Quit
+  an hour with a "paused until HH:MM" countdown), a pending-cut indicator, a
+  live list of active shortcuts, Settings, About, Quit
 - 🗂️ **Tabbed Settings** — Shortcuts / System / Status tabs with a live
   cheat-sheet, diagnostics with a copyable report, settings export & import,
   and a reset-to-defaults control
@@ -115,6 +123,9 @@ unzip it, and move `WinFinder.app` into `/Applications`.
 
 > The released builds are ad-hoc signed. On first launch, macOS asks for
 > **Accessibility** permission — grant it and the shortcuts start working.
+> If the repository is configured with Apple Developer secrets, release
+> builds are instead **signed with a Developer ID certificate, notarized by
+> Apple, and stapled** — Gatekeeper then opens them without extra prompts.
 
 ### Build from source
 
@@ -177,9 +188,11 @@ make archive    # ad-hoc signed .xcarchive in .build/
 | --- | --- |
 | `WinFinder/WinFinderApp.swift` | App lifecycle, event tap, permissions, launch detection |
 | `WinFinder/ShortcutLogic.swift` | Pure shortcut resolver, cut state, key simulation |
+| `WinFinder/L10n.swift` | The localization tables for all 6 interface languages |
 | `WinFinder/MenuBarViews.swift` | Menu bar icon and menu |
-| `WinFinder/SettingsViews.swift` | Settings UI and all 6 localization tables |
-| `scripts/` | Offline validation + unit-test runner |
+| `WinFinder/SettingsViews.swift` | Settings UI, About window, export/import |
+| `WinFinder/*.lproj/InfoPlist.strings` | Localized system permission-dialog text |
+| `scripts/` | Offline validation, unit-test runner, DMG build, signing/notarization |
 | `.github/workflows/` | CI build and release pipelines |
 
 Continuous Integration runs `make test` on every push and pull request on a

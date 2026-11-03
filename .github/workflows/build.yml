@@ -35,8 +35,23 @@ jobs:
       - name: Build (Debug)
         run: make build
 
-      - name: Build Release app
+      - name: Build Release app (universal)
         run: make build CONFIGURATION=Release
+
+      - name: Smoke test (launch, verify, quit)
+        run: |
+          open .build/Build/Products/Release/WinFinder.app
+          for i in $(seq 1 10); do
+            sleep 1
+            pgrep -x WinFinder >/dev/null && break
+          done
+          pgrep -x WinFinder || { echo "WinFinder did not launch" >&2; exit 1; }
+          osascript -e 'tell application "WinFinder" to quit' || true
+          sleep 2
+          if pgrep -x WinFinder >/dev/null; then
+            echo "graceful quit did not finish; killing"
+            pkill -x WinFinder
+          fi
 
       - name: Zip app bundle
         run: |

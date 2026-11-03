@@ -20,6 +20,29 @@ struct ShortcutSettings: Equatable {
 }
 
 extension ShortcutSettings {
+    /// Single source of truth for every shortcut toggle's defaults key and
+    /// default value. The compiled-in registration, the settings reset, the
+    /// export/import payload, and the live cheat-sheet all read from here, so
+    /// a new toggle only needs a property in the struct above plus one row in
+    /// this table.
+    static let keysAndDefaults: [(key: String, value: Bool)] = [
+        ("enterToOpen", true),
+        ("deleteToTrash", true),
+        ("shiftDeletePermanent", true),
+        ("cmdRRename", true),
+        ("cutAndPaste", true),
+        ("altEnterProperties", true),
+        ("altNavFolders", true),
+        ("f5Refresh", true),
+        ("backspaceUpFolder", false),
+        ("ctrlShortcuts", true),
+    ]
+
+    /// The same table as a plain dictionary for `UserDefaults.register`.
+    static var defaultValues: [String: Any] {
+        Dictionary(uniqueKeysWithValues: keysAndDefaults.map { ($0.key, $0.value) })
+    }
+
     /// Reads the live toggles from the given defaults database. The synthesized
     /// memberwise initializer (with the compiled-in defaults) is only meant for
     /// tests; the app must always read the user's toggles via this initializer.
@@ -54,8 +77,9 @@ enum ShortcutAction: Equatable {
 
 enum ShortcutResolver {
     /// Key codes whose keyDown events are observed by the event tap.
-    /// Copy (8) is observed only to invalidate a stale cut state.
-    static let watchedKeys: Set<Int64> = [7, 8, 9, 0, 1, 3, 6, 13, 15, 17, 31, 35, 36, 37, 45, 51, 96, 120, 123, 124, 125, 126]
+    /// Copy (8) is observed only to invalidate a stale cut state; 76 is the
+    /// numeric-keypad Enter, which must open exactly like the main Enter.
+    static let watchedKeys: Set<Int64> = [7, 8, 9, 0, 1, 3, 6, 13, 15, 17, 31, 35, 36, 37, 45, 51, 76, 96, 120, 123, 124, 125, 126]
 
     /// Key codes handled through the optional Ctrl→Command Windows layer:
     /// C, X, V, Z, S, P, A, F, W, T, O, N.
@@ -65,7 +89,7 @@ enum ShortcutResolver {
     /// key/modifier combination has no enabled shortcut.
     static func action(for keyCode: Int64, flags: CGEventFlags, settings s: ShortcutSettings) -> ShortcutAction? {
         switch keyCode {
-        case 36:
+        case 36, 76:
             if s.enterToOpen && hasExactModifiers(flags, []) {
                 return .synthesizeKey(keyCode: 125, flags: .maskCommand)          // Return → Cmd+Down (open)
             }
@@ -173,23 +197,67 @@ enum ShortcutResolver {
 final class CutState {
     static let shared = CutState()
 
+    /// Posted (from any thread) whenever the cut state is marked, cleared, or
+    /// consumed. The menu bar uses it to show a "cut pending" indicator.
+    static let didChangeNotification = Notification.Name("com.winfinderpro.cutstate.changed")
+
+    /// A fast Finder writes the copy onto the pasteboard almost immediately;
+    /// a slow one may take hundreds of milliseconds. Poll briefly instead of
+    /// trusting a fixed delay, so the baseline is captured exactly when the
+    /// copy lands — never before (which would miss it) or after a second
+    /// unrelated copy (which would invalidate a legitimate cut).
+    private static let baselinePollInterval: TimeInterval = 0.05
+    private static let maxBaselinePolls = 40
+
     private let lock = NSLock()
     private var isActive = false
     private var baselineChangeCount: Int?
+    private var preCutChangeCount: Int?
+    private var pollGeneration = 0
 
-    /// Called right after the synthetic Cmd+C is posted. Finder needs a moment
-    /// to place the copy on the pasteboard, so the resulting change count is
-    /// captured asynchronously and becomes the cut's baseline.
+    /// True while a cut is pending. Read from the menu bar on the main thread;
+    /// safe from anywhere thanks to the lock.
+    var active: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isActive
+    }
+
+    /// Called right after the synthetic Cmd+C is posted. The change count
+    /// before the copy is recorded, then the pasteboard is polled until the
+    /// copy actually lands; the new change count becomes the cut's baseline.
     func mark() {
         lock.lock()
         isActive = true
         baselineChangeCount = nil
+        preCutChangeCount = NSPasteboard.general.changeCount
+        pollGeneration += 1
+        let generation = pollGeneration
         lock.unlock()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.captureBaseline(NSPasteboard.general.changeCount)
+        notify()
+        scheduleBaselineCapture(generation: generation, attempt: 0)
+    }
+
+    private func scheduleBaselineCapture(generation: Int, attempt: Int) {
+        guard attempt < Self.maxBaselinePolls else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.baselinePollInterval) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let stillActive = self.isActive && self.pollGeneration == generation && self.baselineChangeCount == nil
+            let preCut = self.preCutChangeCount
+            self.lock.unlock()
+            guard stillActive, let preCut else { return }
+            let current = NSPasteboard.general.changeCount
+            guard current != preCut else {
+                self.scheduleBaselineCapture(generation: generation, attempt: attempt + 1)
+                return
+            }
+            self.captureBaseline(current)
         }
     }
 
+    /// Installs an explicit baseline. Public for the offline logic tests; the
+    /// app itself relies on the polling capture above.
     func captureBaseline(_ changeCount: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -197,28 +265,47 @@ final class CutState {
         baselineChangeCount = changeCount
     }
 
+    private func notify() {
+        NotificationCenter.default.post(name: Self.didChangeNotification, object: nil)
+    }
+
     /// Consumes the cut state if it is still valid for the current pasteboard.
     /// Returns false when there is no cut, or when another copy replaced the
     /// clipboard after the cut (the caller then pastes normally).
     func consume(currentChangeCount: Int) -> Bool {
         lock.lock()
-        defer { lock.unlock() }
-        guard isActive else { return false }
-        if let baseline = baselineChangeCount, baseline != currentChangeCount {
-            isActive = false
-            baselineChangeCount = nil
+        guard isActive else {
+            lock.unlock()
             return false
         }
-        isActive = false
-        baselineChangeCount = nil
-        return true
+        let invalidated: Bool
+        if let baseline = baselineChangeCount, baseline != currentChangeCount {
+            // Another copy replaced the clipboard after the cut: the state is
+            // spent, and the paste falls through as a normal paste.
+            isActive = false
+            baselineChangeCount = nil
+            invalidated = true
+        } else {
+            isActive = false
+            baselineChangeCount = nil
+            invalidated = false
+        }
+        preCutChangeCount = nil
+        pollGeneration += 1
+        lock.unlock()
+        notify()
+        return !invalidated
     }
 
     func clear() {
         lock.lock()
+        let wasActive = isActive
         isActive = false
         baselineChangeCount = nil
+        preCutChangeCount = nil
+        pollGeneration += 1
         lock.unlock()
+        if wasActive { notify() }
     }
 }
 
@@ -247,9 +334,31 @@ enum KeySimulator {
 
 // MARK: - تشخیص ویرایش متن
 enum TextEditingDetector {
+    /// The focused-element AX query runs on the tap thread for every initial
+    /// key press. A very short cache absorbs the cost of fast typing (where
+    /// the focused element cannot change between adjacent keystrokes) without
+    /// materially delaying a just-changed focus target.
+    private static let cacheInterval: TimeInterval = 0.12
+    private static let lock = NSLock()
+    private static var cached: (result: Bool, date: Date)?
+
     /// True when the focused element is a text field or text area, so normal
     /// typing and text shortcuts must pass through untouched.
     static func isUserEditingText() -> Bool {
+        let now = Date()
+        lock.lock()
+        let cachedResult = cached.flatMap { now.timeIntervalSince($0.date) < cacheInterval ? $0.result : nil }
+        lock.unlock()
+        if let cachedResult { return cachedResult }
+
+        let detected = detectUserEditingText()
+        lock.lock()
+        cached = (detected, now)
+        lock.unlock()
+        return detected
+    }
+
+    private static func detectUserEditingText() -> Bool {
         let systemWide = AXUIElementCreateSystemWide()
         var focusedElement: AnyObject?
         let result = AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedElement)
@@ -300,7 +409,22 @@ enum FinderAutomation {
         DispatchQueue.global(qos: .userInitiated).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = ["-e", "tell application \"Finder\" to tell front window to update (get target)"]
+            // One subprocess handles both cases: refresh the front window when
+            // Finder has one, and fall back to the desktop otherwise (F5 with
+            // only the desktop active). A missing front window (-1728) is no
+            // longer treated as "nothing to do".
+            let refreshScript = """
+            tell application "Finder"
+                try
+                    tell front window to update (get target)
+                on error number -1728
+                    try
+                        update desktop
+                    end try
+                end try
+            end tell
+            """
+            process.arguments = ["-e", refreshScript]
             let errorPipe = Pipe()
             process.standardError = errorPipe
             process.standardOutput = FileHandle.nullDevice

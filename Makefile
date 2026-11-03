@@ -2,10 +2,18 @@ PROJECT := WinFinder.xcodeproj
 SCHEME := WinFinder
 CONFIGURATION ?= Debug
 DERIVED_DATA ?= .build
-DESTINATION ?= platform=macOS,arch=arm64
+DESTINATION ?= platform=macOS
 APP := $(DERIVED_DATA)/Build/Products/$(CONFIGURATION)/WinFinder.app
 INSTALL_DIR ?= /Applications
 INSTALLED_APP := $(INSTALL_DIR)/WinFinder.app
+
+# Release builds produce a universal binary (Apple Silicon + Intel); Debug
+# builds stay on the host architecture for fast local iteration.
+ifeq ($(CONFIGURATION),Release)
+UNIVERSAL_SETTINGS := ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO
+else
+UNIVERSAL_SETTINGS :=
+endif
 
 .PHONY: validate test-logic build test archive install dmg clean
 
@@ -18,7 +26,7 @@ validate:
 build: validate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION) \
 		-destination '$(DESTINATION)' -derivedDataPath $(DERIVED_DATA) \
-		build CODE_SIGN_IDENTITY=-
+		build CODE_SIGN_IDENTITY=- $(UNIVERSAL_SETTINGS)
 
 # Offline verification: validation plus logic unit tests plus a local Xcode
 # build, with no package fetches.
@@ -31,7 +39,7 @@ archive: validate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release \
 		-destination '$(DESTINATION)' -derivedDataPath $(DERIVED_DATA) \
 		-archivePath $(DERIVED_DATA)/WinFinder.xcarchive \
-		archive CODE_SIGN_IDENTITY=-
+		archive CODE_SIGN_IDENTITY=- $(UNIVERSAL_SETTINGS)
 
 install: build
 	@test -d "$(APP)"

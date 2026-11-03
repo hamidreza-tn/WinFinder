@@ -50,12 +50,13 @@ codesign --verify "$STAGING/payload/WinFinder.app" 2>/dev/null \
     || echo "note: staged app is not code-signed"
 
 echo "==> creating read-write image"
+# No explicit -size: hdiutil sizes the image from the staged payload, so the
+# script cannot fail when the app bundle grows.
 hdiutil create -ov -quiet \
     -volname "$VOLNAME" \
     -srcfolder "$STAGING/payload" \
     -fs HFS+ \
     -format UDRW \
-    -size 220m \
     "$RW_DMG"
 
 echo "==> mounting"

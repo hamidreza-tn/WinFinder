@@ -18,10 +18,12 @@ defaults:
 
 jobs:
   release:
-    name: Build and publish a GitHub Release
+    name: Build, notarize, and publish a GitHub Release
     runs-on: macos-26
     permissions:
       contents: write
+    env:
+      APP_PATH: .build/Build/Products/Release/WinFinder.app
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,17 +37,55 @@ jobs:
       - name: Run unit tests
         run: make test-logic
 
-      - name: Build Release app
+      - name: Build Release app (universal)
         run: make build CONFIGURATION=Release
+
+      - name: Smoke test (launch, verify, quit)
+        run: |
+          open "$APP_PATH"
+          for i in $(seq 1 10); do
+            sleep 1
+            pgrep -x WinFinder >/dev/null && break
+          done
+          pgrep -x WinFinder || { echo "WinFinder did not launch" >&2; exit 1; }
+          osascript -e 'tell application "WinFinder" to quit' || true
+          sleep 2
+          if pgrep -x WinFinder >/dev/null; then
+            echo "graceful quit did not finish; killing"
+            pkill -x WinFinder
+          fi
+
+      - name: Sign and notarize the app (skipped without secrets)
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_ID: ${{ secrets.APPLE_NOTARY_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_NOTARY_TEAMID: ${{ secrets.APPLE_NOTARY_TEAMID }}
+        run: bash scripts/sign_notarize.sh app "$APP_PATH"
 
       - name: Zip app bundle
         run: |
           /usr/bin/ditto -c -k --keepParent \
-            .build/Build/Products/Release/WinFinder.app \
+            "$APP_PATH" \
             "WinFinder-${GITHUB_REF_NAME}.zip"
 
       - name: Build installer DMG
-        run: bash scripts/build_dmg.sh
+        run: bash scripts/build_dmg.sh "$APP_PATH" "WinFinder-${GITHUB_REF_NAME#v}.dmg"
+
+      - name: Notarize the DMG (skipped without secrets)
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_NOTARY_ID: ${{ secrets.APPLE_NOTARY_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_NOTARY_TEAMID: ${{ secrets.APPLE_NOTARY_TEAMID }}
+        run: |
+          if [ -n "${APPLE_CERTIFICATE_P12:-}" ]; then
+            bash scripts/sign_notarize.sh dmg "WinFinder-${GITHUB_REF_NAME#v}.dmg"
+          else
+            echo "==> not configured; DMG ships unsigned (app inside is ad-hoc signed)"
+          fi
 
       - name: Create GitHub Release
         env:
