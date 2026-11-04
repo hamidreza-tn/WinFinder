@@ -33,7 +33,7 @@ and SwiftUI.
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> cut & paste | ✔ <kbd>⌘X</kbd> cuts and <kbd>⌘V</kbd> moves, like Windows |
 | <kbd>Alt</kbd>+<kbd>Enter</kbd> shows properties | ✔ Opens Get Info |
 | <kbd>Backspace</kbd> / <kbd>Alt</kbd>+<kbd>↑↓←→</kbd> navigate | ✔ Up / open / back / forward (all four directions) |
-| <kbd>F5</kbd> refreshes | ✔ Refreshes the active Finder window (or the desktop when no window is open) |
+| <kbd>F5</kbd> refreshes | ✔ Refreshes the active Finder window (or the desktop when no window is open; optionally all windows) |
 
 Plus an optional **Windows Ctrl layer** that maps your Windows <kbd>Ctrl</kbd>
 habits onto their <kbd>⌘</kbd> equivalents — <kbd>Ctrl</kbd>+<kbd>C</kbd>,
@@ -103,6 +103,12 @@ are active.
 - 🚦 **Menu bar control** — status icon, one-click pause/resume (or pause for
   an hour with a "paused until HH:MM" countdown), a pending-cut indicator, a
   live list of active shortcuts, Settings, About, Quit
+- 🔪 **Pending-cut HUD** — a small floating confirmation appears at the bottom
+  of the Finder window when you cut, since Finder offers no visual highlight
+- 🪄 **First-run onboarding** — a Get-started card with live permission
+  checkmarks walks you through Accessibility and the first F5
+- 🔗 **URL scheme** — `winfinder://pause`, `resume`, `toggle`, `settings`,
+  `about` for scripts and Shortcuts.app
 - 🗂️ **Tabbed Settings** — Shortcuts / System / Status tabs with a live
   cheat-sheet, diagnostics with a copyable report, settings export & import,
   and a reset-to-defaults control
@@ -165,6 +171,20 @@ crash reporting, and nothing is written to disk except your own preferences.
 Keyboard events are inspected locally to decide whether a shortcut applies and
 are never stored, logged, or transmitted. The entire codebase is small enough
 to read in one sitting — that is the privacy policy.
+
+## Automation & URL scheme
+
+WinFinder understands simple `winfinder://` URLs — handy for scripts,
+Shortcuts.app, or other tools (use `open "winfinder://pause"` on the command
+line):
+
+| URL | Effect |
+| --- | --- |
+| `winfinder://pause` | Pause all shortcuts |
+| `winfinder://resume` | Resume |
+| `winfinder://toggle` | Toggle the pause state |
+| `winfinder://settings` | Open the Settings window |
+| `winfinder://about` | Open the About window |
 
 ## How it works
 

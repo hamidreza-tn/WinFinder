@@ -69,15 +69,15 @@ key stays single-shot.
   which is the guarantee String Catalogs would otherwise provide.
 - **No DerivedData cache in CI.** The build takes ~2–3 minutes and a shared
   cache risks stale-module failures; caching would save less than a minute.
-- **Enabling notarized releases (future).** With a paid Apple Developer
-  account: create a *Developer ID Application* certificate, add
-  `DEVELOPER_ID_IDENTITY`, `NOTARYTOOL_PROFILE` (via `xcrun notarytool
-  store-credentials`) values as repository secrets, then extend
-  `.github/workflows/release.yml` to sign the built app with the identity,
-  submit it with `xcrun notarytool submit`, staple the ticket
-  (`xcrun stapler staple`), and zip the stapled bundle. Until then, releases
-  are ad-hoc signed and macOS shows a one-time Gatekeeper warning
-  (right-click → Open).
+- **Enabling notarized releases (conditional, implemented).** The release
+  pipeline already supports Developer ID signing, Apple notarization, and
+  stapling through `scripts/sign_notarize.sh`. It activates as soon as these
+  five repository secrets are set: `APPLE_CERTIFICATE_P12` (base64-encoded
+  Developer ID Application certificate), `APPLE_CERTIFICATE_PASSWORD`,
+  `APPLE_NOTARY_ID` (Apple ID), `APPLE_NOTARY_PASSWORD` (app-specific
+  password), and `APPLE_NOTARY_TEAMID`. Without the secrets the script
+  no-ops and releases stay ad-hoc signed (one-time Gatekeeper warning,
+  right-click → Open).
 
 ## Release flow
 

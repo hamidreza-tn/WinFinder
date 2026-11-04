@@ -42,13 +42,14 @@ makefile = read(MAKEFILE)
 
 # --- Build configuration -----------------------------------------------------
 require(project.count("MACOSX_DEPLOYMENT_TARGET = 13.0;") == 2, "deployment target must be 13.0 in Debug and Release")
-require(project.count("MARKETING_VERSION = 2.6.0;") == 2, "marketing version must be 2.6.0 in Debug and Release")
-require(project.count("CURRENT_PROJECT_VERSION = 10;") == 2, "build number must be 10 in Debug and Release")
+require(project.count("MARKETING_VERSION = 2.7.0;") == 2, "marketing version must be 2.7.0 in Debug and Release")
+require(project.count("CURRENT_PROJECT_VERSION = 11;") == 2, "build number must be 11 in Debug and Release")
 require(project.count("GENERATE_INFOPLIST_FILE = NO;") == 2, "explicit Info.plist must be used")
 require(project.count("INFOPLIST_FILE = Config/WinFinder-Info.plist;") == 2, "custom Info.plist is missing")
 require(project.count("PRODUCT_BUNDLE_IDENTIFIER = com.winfinderpro.app;") == 2, "bundle identifier must be the neutral public one")
 for key in ("CFBundleShortVersionString", "CFBundleVersion", "LSUIElement", "NSAppleEventsUsageDescription"):
     require(key in info_plist, f"Info.plist is missing {key}")
+require("CFBundleURLSchemes" in info_plist and "winfinder" in info_plist, "the winfinder:// URL scheme must be registered")
 require("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;" in project, "missing ASSETCATALOG_COMPILER_APPICON_NAME")
 
 # --- Public-repository hygiene ----------------------------------------------
@@ -142,6 +143,10 @@ require("maxBaselinePolls" in logic_source, "the cut baseline must be polled, no
 require("osascript" in logic_source, "Finder refresh must run through osascript off the main thread")
 require("FileHandle.nullDevice" in logic_source, "osascript stdout must go to the null device")
 require("update desktop" in logic_source, "F5 must fall back to refreshing the desktop when no window is open")
+require("f5AllWindows" in logic_source and "f5AllWindows" in settings_source, "the refresh-all-windows toggle is missing")
+require("AtomicFlag" in logic_source, "the osascript watchdog must share its exit state through a lock-guarded flag")
+require("kAEGetURL" in main_source and "handleURLScheme" in main_source, "the winfinder:// URL scheme handler is missing")
+require("CutHUD" in main_source, "the pending-cut HUD feedback is missing")
 require("environmentObject(appDelegate)" in main_source, "status views observe the real AppDelegate")
 require("L10n.tr" in menu_source and "L10n.tr" in settings_source, "UI strings must go through the localization helper")
 require("appLanguage" in settings_source, "in-app language switcher is missing")
@@ -150,6 +155,7 @@ require(L10N_SOURCE.is_file(), "L10n.swift must exist (localization lives in its
 require("diag.copyreport" in settings_source, "diagnostics copy-report control is missing")
 require("delete.inactiveHint" in settings_source, "the overridden trash toggle must say so")
 require("perm.title" in settings_source, "the permissions group must have a short title")
+require("onboarding.title" in settings_source, "the first-run onboarding card is missing")
 require("TabView" in settings_source, "the settings window must use a tabbed layout")
 require("CardGroupBoxStyle" in settings_source, "settings groups must use the card style")
 require("showAboutWindow" in main_source, "the menu bar must expose an About window")

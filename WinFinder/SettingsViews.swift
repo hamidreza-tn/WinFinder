@@ -183,9 +183,11 @@ struct MainSettingsView: View {
     @AppStorage("altEnterProperties") private var altEnterProperties = true
     @AppStorage("altNavFolders") private var altNavFolders = true
     @AppStorage("f5Refresh") private var f5Refresh = true
+    @AppStorage("f5AllWindows") private var f5AllWindows = false
     @AppStorage("backspaceUpFolder") private var backspaceUpFolder = false
     @AppStorage("ctrlShortcuts") private var ctrlShortcuts = true
     @AppStorage("launchAtLogin") private var launchAtLogin = true
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var didCopyReport = false
     @State private var showResetConfirmation = false
     @State private var isApplyingLoginChange = false
@@ -198,6 +200,9 @@ struct MainSettingsView: View {
             TabView {
                 ScrollView {
                     VStack(spacing: Design.groupSpacing) {
+                        if showOnboarding {
+                            onboardingGroup
+                        }
                         shortcutGuideGroup
                         fileManagementGroup
                         navigationGroup
@@ -234,6 +239,9 @@ struct MainSettingsView: View {
                minHeight: 540, idealHeight: 620, maxHeight: 780)
         .navigationTitle(L10n.tr(appLanguage, "window.title"))
         .background(WindowIdentifierSetter(id: WinFinderWindowID.settings))
+        .onChange(of: appDelegate.isAccessGranted) { granted in
+            if granted { hasCompletedOnboarding = true }
+        }
         .environment(\.layoutDirection, appLanguage == "fa" ? .rightToLeft : .leftToRight)
         .confirmationDialog(
             L10n.tr(appLanguage, "reset.confirm"),
@@ -433,6 +441,12 @@ struct MainSettingsView: View {
                 )
                 Divider()
                 ToggleRowItem(
+                    title: L10n.tr(appLanguage, "f5all.title"),
+                    subtitle: L10n.tr(appLanguage, "f5all.subtitle"),
+                    isOn: $f5AllWindows
+                )
+                Divider()
+                ToggleRowItem(
                     title: L10n.tr(appLanguage, "ctrl.title"),
                     subtitle: L10n.tr(appLanguage, "ctrl.subtitle"),
                     isOn: $ctrlShortcuts
@@ -621,6 +635,68 @@ struct MainSettingsView: View {
         """
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
+    }
+
+    /// The onboarding card stays visible until Accessibility is granted AND
+    /// the moment has been acknowledged, so a user who denies the permission
+    /// keeps seeing how to recover.
+    private var showOnboarding: Bool {
+        !hasCompletedOnboarding || !appDelegate.isAccessGranted
+    }
+
+    @ViewBuilder
+    private var onboardingGroup: some View {
+        GroupBox(label: Label(L10n.tr(appLanguage, "onboarding.title"), systemImage: "sparkles")) {
+            VStack(alignment: .leading, spacing: Design.rowSpacing) {
+                onboardingStep(
+                    number: 1,
+                    text: L10n.tr(appLanguage, "onboarding.step1"),
+                    done: appDelegate.isAccessGranted
+                )
+                if !appDelegate.isAccessGranted {
+                    Button(L10n.tr(appLanguage, "header.enableAccess")) {
+                        appDelegate.requestAccessManually()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color(nsColor: .systemOrange))
+                    .controlSize(.small)
+                }
+                onboardingStep(
+                    number: 2,
+                    text: L10n.tr(appLanguage, "onboarding.step2"),
+                    done: appDelegate.isFinderAutomationDenied ? false : nil
+                )
+                onboardingStep(
+                    number: 3,
+                    text: L10n.tr(appLanguage, "onboarding.step3"),
+                    done: nil
+                )
+            }
+        }
+        .groupBoxStyle(CardGroupBoxStyle())
+    }
+
+    private func onboardingStep(number: Int, text: String, done: Bool?) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(done == true ? Color(nsColor: .systemGreen).opacity(0.15) : Color.secondary.opacity(0.10))
+                    .frame(width: 22, height: 22)
+                if done == true {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(nsColor: .systemGreen))
+                } else {
+                    Text("\(number)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+            }
+            Text(text)
+                .font(.caption)
+                .foregroundColor(done == true ? .secondary : .primary)
+            Spacer()
+        }
     }
 
     private var shortcutGuideGroup: some View {

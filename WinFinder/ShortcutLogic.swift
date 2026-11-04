@@ -15,6 +15,7 @@ struct ShortcutSettings: Equatable {
     var altEnterProperties = true
     var altNavFolders = true
     var f5Refresh = true
+    var f5AllWindows = false
     var backspaceUpFolder = false
     var ctrlShortcuts = true
 }
@@ -34,6 +35,7 @@ extension ShortcutSettings {
         ("altEnterProperties", true),
         ("altNavFolders", true),
         ("f5Refresh", true),
+        ("f5AllWindows", false),
         ("backspaceUpFolder", false),
         ("ctrlShortcuts", true),
     ]
@@ -56,6 +58,7 @@ extension ShortcutSettings {
             altEnterProperties: defaults.bool(forKey: "altEnterProperties"),
             altNavFolders: defaults.bool(forKey: "altNavFolders"),
             f5Refresh: defaults.bool(forKey: "f5Refresh"),
+            f5AllWindows: defaults.bool(forKey: "f5AllWindows"),
             backspaceUpFolder: defaults.bool(forKey: "backspaceUpFolder"),
             ctrlShortcuts: defaults.bool(forKey: "ctrlShortcuts")
         )
@@ -378,6 +381,25 @@ enum TextEditingDetector {
 }
 
 // MARK: - رفرش Finder
+/// Minimal lock-guarded boolean shared between a task and its watchdog
+/// closure; satisfies the Sendable-capture checking a plain `var` trips.
+final class AtomicFlag {
+    private let lock = NSLock()
+    private var value = false
+
+    func set() {
+        lock.lock()
+        value = true
+        lock.unlock()
+    }
+
+    func get() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+}
+
 enum FinderAutomation {
     /// Outcome of one refresh attempt, classified from osascript's result.
     /// `-1743` is the Apple Events permission denial; `-1728` ("can't get
@@ -402,6 +424,7 @@ enum FinderAutomation {
     /// osascript after five seconds so a hung Finder cannot leak one blocked
     /// thread per press.
     static func refreshFrontWindow(
+        refreshAllWindows: Bool = false,
         onDenied: @escaping () -> Void,
         onFailure: @escaping (String) -> Void,
         onSuccess: @escaping () -> Void
@@ -409,22 +432,35 @@ enum FinderAutomation {
         DispatchQueue.global(qos: .userInitiated).async {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            // One subprocess handles both cases: refresh the front window when
-            // Finder has one, and fall back to the desktop otherwise (F5 with
-            // only the desktop active). A missing front window (-1728) is no
-            // longer treated as "nothing to do".
+            // One subprocess handles every case: the front window, every open
+            // window (the optional F5-all toggle), and a desktop fallback when
+            // Finder has no window at all. A missing front window (-1728) is
+            // no longer treated as "nothing to do".
             let refreshScript = """
-            tell application "Finder"
-                try
-                    tell front window to update (get target)
-                on error number -1728
+            on run argv
+                set refreshAllWindows to ((count of argv) > 0) and ((item 1 of argv) is "all")
+                tell application "Finder"
                     try
-                        update desktop
+                        if refreshAllWindows then
+                            repeat with w in windows
+                                try
+                                    update w
+                                end try
+                            end repeat
+                        else
+                            tell front window to update (get target)
+                        end if
+                    on error number -1728
+                        try
+                            update desktop
+                        end try
                     end try
-                end try
-            end tell
+                end tell
+            end run
             """
-            process.arguments = ["-e", refreshScript]
+            process.arguments = refreshAllWindows
+                ? ["-e", refreshScript, "all"]
+                : ["-e", refreshScript]
             let errorPipe = Pipe()
             process.standardError = errorPipe
             process.standardOutput = FileHandle.nullDevice
@@ -435,24 +471,18 @@ enum FinderAutomation {
                 return
             }
 
-            let stateLock = NSLock()
-            var didExit = false
+            let didExit = AtomicFlag()
             let pid = process.processIdentifier
             DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
-                stateLock.lock()
-                let finished = didExit
-                stateLock.unlock()
                 // kill() instead of Process.terminate(): safe even if the
                 // process exited between the check and the signal.
-                if !finished, pid > 0 {
+                if !didExit.get(), pid > 0 {
                     kill(pid, SIGTERM)
                 }
             }
 
             process.waitUntilExit()
-            stateLock.lock()
-            didExit = true
-            stateLock.unlock()
+            didExit.set()
 
             let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
             let message = String(data: data, encoding: .utf8) ?? ""

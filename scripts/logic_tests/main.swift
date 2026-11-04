@@ -154,6 +154,7 @@ let structDefaults: [String: Bool] = [
     "altEnterProperties": snapshot.altEnterProperties,
     "altNavFolders": snapshot.altNavFolders,
     "f5Refresh": snapshot.f5Refresh,
+    "f5AllWindows": snapshot.f5AllWindows,
     "backspaceUpFolder": snapshot.backspaceUpFolder,
     "ctrlShortcuts": snapshot.ctrlShortcuts,
 ]

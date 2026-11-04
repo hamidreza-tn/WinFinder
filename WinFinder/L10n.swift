@@ -4,8 +4,9 @@ import Foundation
 /// English is the primary language; every missing entry falls back to English,
 /// then to the raw key. Living in its own file keeps the settings UI readable
 /// and lets a new language be added by appending one table plus one entry in
-/// `tables` and `supportedLanguages`.
-enum L10n {
+/// `tables` and `supportedLanguages`. Nonisolated: the tables are immutable,
+/// and `tr` is also read from nonisolated AppKit contexts.
+nonisolated enum L10n {
     /// Supported interface languages with their native names, in picker order.
     static let supportedLanguages: [(code: String, nativeName: String)] = [
         ("en", "English"),
@@ -118,6 +119,12 @@ enum L10n {
             "footer.note": "Closing this window keeps WinFinder running in the menu bar.",
             "footer.close": "Close window",
             "cut.pending": "Cut pending — press Cmd+V to move",
+            "f5all.title": "Refresh all Finder windows with F5",
+            "f5all.subtitle": "When enabled, F5 refreshes every open Finder window instead of only the active one",
+            "onboarding.title": "Get started",
+            "onboarding.step1": "Grant Accessibility — required for all shortcuts",
+            "onboarding.step2": "Press F5 in Finder — macOS asks for the Automation permission",
+            "onboarding.step3": "Try Enter, Cmd+X → Cmd+V, F2, or Alt+↑ in Finder",
         ]
 
     private static let spanish: [String: String] = [
@@ -214,6 +221,12 @@ enum L10n {
             "footer.note": "Al cerrar esta ventana, WinFinder sigue activo en la barra de menús.",
             "footer.close": "Cerrar ventana",
             "cut.pending": "Corte pendiente — pulse Cmd+V para mover",
+            "f5all.title": "Actualizar todas las ventanas de Finder con F5",
+            "f5all.subtitle": "Si está activado, F5 actualiza todas las ventanas abiertas de Finder en lugar de solo la activa",
+            "onboarding.title": "Primeros pasos",
+            "onboarding.step1": "Conceda Accesibilidad — necesario para todos los atajos",
+            "onboarding.step2": "Pulse F5 en Finder — macOS pedirá el permiso de Automatización",
+            "onboarding.step3": "Pruebe Enter, Cmd+X → Cmd+V, F2 o Alt+↑ en Finder",
         ]
 
     private static let french: [String: String] = [
@@ -310,6 +323,12 @@ enum L10n {
             "footer.note": "En fermant cette fenêtre, WinFinder reste actif dans la barre des menus.",
             "footer.close": "Fermer la fenêtre",
             "cut.pending": "Couper en attente — appuyez sur Cmd+V pour déplacer",
+            "f5all.title": "Actualiser toutes les fenêtres de Finder avec F5",
+            "f5all.subtitle": "Si activé, F5 actualise toutes les fenêtres ouvertes de Finder au lieu de la fenêtre active uniquement",
+            "onboarding.title": "Premiers pas",
+            "onboarding.step1": "Autorisez l'Accessibilité — requise pour tous les raccourcis",
+            "onboarding.step2": "Appuyez sur F5 dans Finder — macOS demande l'autorisation d'Automatisation",
+            "onboarding.step3": "Essayez Entrée, Cmd+X → Cmd+V, F2 ou Alt+↑ dans Finder",
         ]
 
     private static let chinese: [String: String] = [
@@ -406,6 +425,12 @@ enum L10n {
             "footer.note": "关闭此窗口后，WinFinder 仍会保留在菜单栏。",
             "footer.close": "关闭窗口",
             "cut.pending": "剪切待粘贴 — 按 Cmd+V 移动",
+            "f5all.title": "F5 刷新所有 Finder 窗口",
+            "f5all.subtitle": "开启后，F5 会刷新所有打开的 Finder 窗口，而不只是当前窗口",
+            "onboarding.title": "开始使用",
+            "onboarding.step1": "授予辅助功能权限 — 所有快捷键都需要",
+            "onboarding.step2": "在 Finder 中按一次 F5 — macOS 会请求“自动化”权限",
+            "onboarding.step3": "在 Finder 中试试 Enter、Cmd+X → Cmd+V、F2 或 Alt+↑",
         ]
 
     private static let hindi: [String: String] = [
@@ -502,6 +527,12 @@ enum L10n {
             "footer.note": "यह विंडो बंद करने पर भी WinFinder मेन्यू बार में चालू रहता है।",
             "footer.close": "विंडो बंद करें",
             "cut.pending": "कट लंबित — मूव करने के लिए Cmd+V दबाएँ",
+            "f5all.title": "F5 से सभी Finder विंडो रिफ्रेश करें",
+            "f5all.subtitle": "चालू होने पर, F5 केवल सक्रिय विंडो के बजाय खुली सभी Finder विंडो रिफ्रेश करता है",
+            "onboarding.title": "शुरुआत करें",
+            "onboarding.step1": "Accessibility प्रदान करें — सभी शॉर्टकट के लिए आवश्यक",
+            "onboarding.step2": "Finder में F5 दबाएँ — macOS Automation अनुमति माँगेगा",
+            "onboarding.step3": "Finder में Enter, Cmd+X → Cmd+V, F2 या Alt+↑ आज़माएँ",
         ]
 
     private static let persian: [String: String] = [
@@ -598,6 +629,12 @@ enum L10n {
             "footer.note": "با بستن پنجره، برنامه در نوار بالا فعال می‌ماند.",
             "footer.close": "بستن پنجره",
             "cut.pending": "برش در انتظار — برای انتقال Cmd+V بزنید",
+            "f5all.title": "رفرش همه پنجره‌های Finder با F5",
+            "f5all.subtitle": "با فعال بودن، F5 همه پنجره‌های باز Finder را رفرش می‌کند؛ در غیر این صورت فقط پنجره فعال",
+            "onboarding.title": "شروع به کار",
+            "onboarding.step1": "دسترسی Accessibility را بدهید — برای همه میانبرها لازم است",
+            "onboarding.step2": "یک بار F5 را در Finder بزنید — macOS مجوز Automation را می‌پرسد",
+            "onboarding.step3": "در Finder این‌ها را امتحان کنید: Enter، Cmd+X → Cmd+V، F2 و Alt+↑",
         ]
 
     private static let tables: [String: [String: String]] = [

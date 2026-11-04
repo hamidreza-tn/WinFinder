@@ -207,9 +207,42 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             forEventClass: kCoreEventClass,
             andEventID: kAEOpenApplication
         )
+
+        // winfinder:// URLs from scripts, Shortcuts.app, or other tools.
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
     }
 
-    @objc private func handleOpenApplicationEvent(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
+    /// Dispatches `winfinder://pause`, `resume`, `toggle`, `settings`, `about`.
+    func handleURLScheme(_ url: URL) {
+        switch (url.host ?? url.path).lowercased() {
+        case "pause":
+            setPaused(true)
+        case "resume":
+            setPaused(false)
+        case "toggle":
+            setPaused(!isPaused)
+        case "settings":
+            showSettingsWindow()
+        case "about":
+            showAboutWindow()
+        default:
+            NSLog("WinFinder: unknown URL scheme command: \(url.absoluteString)")
+        }
+    }
+
+    @MainActor @objc private func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
+        // Apple Events arrive on the main thread's run loop.
+        guard let urlString = event.forKeyword(keyDirectObject)?.stringValue,
+              let url = URL(string: urlString) else { return }
+        handleURLScheme(url)
+    }
+
+    @MainActor @objc private func handleOpenApplicationEvent(_ event: NSAppleEventDescriptor, withReplyEvent reply: NSAppleEventDescriptor) {
         receivedOpenApplicationEvent = true
         // This event is delivered to login-item launches too, and during
         // app launch it is dispatched before didFinishLaunching has set the
@@ -250,10 +283,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?["launchAtLogin"] != nil
 
         // Shortcut toggles come from the single default table in
-        // ShortcutSettings; only the two system-level keys are listed here.
+        // ShortcutSettings; only the system-level keys are listed here.
         var registeredDefaults = ShortcutSettings.defaultValues
         registeredDefaults["launchAtLogin"] = true
         registeredDefaults["appLanguage"] = "en"
+        registeredDefaults["hasCompletedOnboarding"] = false
         defaults.register(defaults: registeredDefaults)
 
         // Prime the tap-thread settings cache before the event tap can start.
@@ -387,8 +421,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /// Localized title of the settings window, kept only as a fallback for
     /// window recognition before the SwiftUI scene installs its identifier.
-    /// Nonisolated: Apple Event delegate methods run outside the actor pool.
-    nonisolated static var settingsWindowTitle: String {
+    static var settingsWindowTitle: String {
         L10n.tr(UserDefaults.standard.string(forKey: "appLanguage") ?? "en", "window.title")
     }
 
@@ -396,7 +429,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// to the localized title for the brief moment before SwiftUI attaches
     /// the WindowIdentifierSetter background view. Titles change with the
     /// interface language, so the identifier is the authoritative match.
-    nonisolated static func isSettingsWindow(_ window: NSWindow) -> Bool {
+    @MainActor static func isSettingsWindow(_ window: NSWindow) -> Bool {
         window.identifier == WinFinderWindowID.settings || window.title == settingsWindowTitle
     }
 
@@ -482,7 +515,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
-    private func performShowWindow(id: String) {
+    @MainActor private func performShowWindow(id: String) {
         userRequestedSettingsWindow = true
         if let action = openWindowAction {
             action(id: id)
@@ -825,11 +858,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         case .beginCut:
             if KeySimulator.post(keyCode: 8, flags: .maskCommand) {
                 CutState.shared.mark()
+                DispatchQueue.main.async { CutHUD.show() }
             } else {
                 return Unmanaged.passUnretained(event)
             }
         case .pasteAfterCut:
             if CutState.shared.consume(currentChangeCount: NSPasteboard.general.changeCount) {
+                DispatchQueue.main.async { CutHUD.hide() }
                 if !KeySimulator.post(keyCode: 9, flags: [.maskAlternate, .maskCommand]) {
                     CutState.shared.clear()
                     return Unmanaged.passUnretained(event)
@@ -841,6 +876,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             }
         case .refreshFinder:
             FinderAutomation.refreshFrontWindow(
+                refreshAllWindows: settings.f5AllWindows,
                 onDenied: { AppDelegate.shared?.reportIssue(.finderAutomationDenied) },
                 onFailure: { AppDelegate.shared?.reportIssue(.finderRefreshFailed($0)) },
                 onSuccess: { AppDelegate.shared?.finderAutomationSucceeded() }
@@ -948,6 +984,124 @@ extension AppDelegate.AppIssue {
 }
 
 // MARK: - وضعیت Launch at Login
+/// A small non-activating floating panel confirming a pending cut, anchored to
+/// the bottom of the frontmost Finder window. Finder offers no visual cut
+/// highlight, so this is the immediate feedback; the menu bar keeps a
+/// persistent scissors indicator until the paste lands.
+enum CutHUD {
+    private static var panel: NSPanel?
+    private static var dismissWorkItem: DispatchWorkItem?
+    private static let displayDuration: TimeInterval = 1.6
+
+    static func show() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { show() }
+            return
+        }
+        dismissWorkItem?.cancel()
+        panel?.orderOut(nil)
+        panel = nil
+
+        let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "en"
+        let text = L10n.tr(language, "cut.pending")
+
+        let size = NSSize(width: 320, height: 44)
+        let axFrame = frontFinderWindowFrame()
+        let anchor = axFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        // AX reports top-left screen coordinates (raw rect: minY = window top
+        // in AX space, maxY = window bottom in AX space); NSPanel wants
+        // bottom-left coordinates, where the screen top is frame.maxY.
+        let screen = NSScreen.screens.first { $0.frame.minX <= anchor.midX && anchor.midX <= $0.frame.maxX } ?? NSScreen.main
+        let screenTop = screen?.frame.maxY ?? 800
+        let origin: NSPoint
+        if axFrame != nil {
+            origin = NSPoint(x: anchor.midX - size.width / 2, y: screenTop - anchor.maxY + 24)
+        } else {
+            // No Finder window frame: bottom-center of the visible screen.
+            origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY + 24)
+        }
+
+        let effect = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        effect.material = .hudWindow
+        effect.state = .active
+        effect.wantsLayer = true
+        effect.layer?.cornerRadius = 12
+        effect.layer?.masksToBounds = true
+
+        let label = NSTextField(labelWithString: text)
+        label.frame = effect.bounds.insetBy(dx: 14, dy: 8)
+        label.autoresizingMask = [.width, .height]
+        label.alignment = .center
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .white
+        effect.addSubview(label)
+
+        let hud = NSPanel(
+            contentRect: NSRect(origin: origin, size: size),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        hud.level = .statusBar
+        hud.isOpaque = false
+        hud.backgroundColor = .clear
+        hud.hasShadow = false
+        hud.ignoresMouseEvents = true
+        hud.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        hud.contentView = effect
+        hud.orderFrontRegardless()
+        panel = hud
+
+        let dismiss = DispatchWorkItem {
+            hud.orderOut(nil)
+            if panel === hud { panel = nil }
+        }
+        dismissWorkItem = dismiss
+        DispatchQueue.main.asyncAfter(deadline: .now() + displayDuration, execute: dismiss)
+    }
+
+    static func hide() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { hide() }
+            return
+        }
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+        panel?.orderOut(nil)
+        panel = nil
+    }
+
+    /// Frame of Finder's main window via Accessibility; nil when Finder is not
+    /// frontmost or the AX query fails (the caller then centers on the main
+    /// screen instead).
+    private static func frontFinderWindowFrame() -> NSRect? {
+        guard let finder = NSWorkspace.shared.frontmostApplication,
+              finder.bundleIdentifier == "com.apple.finder" else { return nil }
+        let appElement = AXUIElementCreateApplication(finder.processIdentifier)
+        var windowRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &windowRef) == .success,
+              let windowRef,
+              CFGetTypeID(windowRef) == AXUIElementGetTypeID() else { return nil }
+        let window = unsafeBitCast(windowRef, to: AXUIElement.self)
+
+        var positionRef: AnyObject?
+        var sizeRef: AnyObject?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionRef) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeRef) == .success,
+              let positionRef, let sizeRef else { return nil }
+        // CF downcasts from AnyObject always succeed; the values are AXValues
+        // whenever the AX attribute exists.
+        let positionValue = positionRef as! AXValue
+        let sizeValue = sizeRef as! AXValue
+
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        AXValueGetValue(positionValue, .cgPoint, &point)
+        AXValueGetValue(sizeValue, .cgSize, &size)
+        return NSRect(origin: point, size: size)
+    }
+}
+
 enum LaunchAtLoginState {
     static var isRegistered: Bool {
         switch SMAppService.mainApp.status {
