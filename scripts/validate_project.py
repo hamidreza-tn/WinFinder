@@ -80,6 +80,9 @@ code_files = [PROJECT, MAIN_SOURCE, LOGIC_SOURCE, L10N_SOURCE, MENU_SOURCE, SETT
               ROOT / ".github" / "workflows" / "build.yml", ROOT / ".github" / "workflows" / "release.yml"]
 for text_file in code_files:
     require(personal_marker not in scanned_text(text_file), f"personal information found in {text_file.name}")
+    # No local machine paths (usernames, workspace layout) may leak into
+    # tracked files either.
+    require("/Users/" not in scanned_text(text_file), f"local machine path found in {text_file.name}")
 # Documentation may legitimately reference the public repository owner
 # (badges, clone URLs); only the old personal bundle identifier is forbidden.
 for text_file in [ROOT / "README.md", ROOT / "CONTRIBUTING.md", ROOT / "LICENSE"]:
